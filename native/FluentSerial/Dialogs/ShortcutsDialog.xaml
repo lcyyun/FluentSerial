@@ -1,0 +1,65 @@
+<Window x:Class="FluentSerial.Dialogs.ShortcutsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="键盘快捷键"
+        Width="520"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Icon="pack://application:,,,/Assets/app.ico"
+        FontFamily="Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI"
+        TextOptions.TextFormattingMode="Display">
+    <Grid Margin="28,24,28,22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="键盘快捷键" Style="{StaticResource PageTitleStyle}" />
+
+        <StackPanel Grid.Row="1" Margin="0,18,0,0">
+            <Border Background="{DynamicResource AppSurfaceBrush}" BorderBrush="{DynamicResource AppBorderBrush}"
+                    BorderThickness="0.5" CornerRadius="10" Padding="18,8">
+                <StackPanel>
+                    <Grid Height="34">
+                        <TextBlock Text="打开或关闭串口" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Text="Ctrl + O" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}" />
+                    </Grid>
+                    <Border Style="{StaticResource HairlineStyle}" />
+                    <Grid Height="34">
+                        <TextBlock Text="发送输入区内容" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Text="Ctrl + Enter" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}" />
+                    </Grid>
+                    <Border Style="{StaticResource HairlineStyle}" />
+                    <Grid Height="34">
+                        <TextBlock Text="清空接收控制台" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Text="Ctrl + L" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}" />
+                    </Grid>
+                    <Border Style="{StaticResource HairlineStyle}" />
+                    <Grid Height="34">
+                        <TextBlock Text="刷新串口列表" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Text="F5" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}" />
+                    </Grid>
+                    <Border Style="{StaticResource HairlineStyle}" />
+                    <Grid Height="34">
+                        <TextBlock Text="切换页面" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Text="Ctrl + 1 … 4" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}" />
+                    </Grid>
+                    <Border Style="{StaticResource HairlineStyle}" />
+                    <Grid Height="34">
+                        <TextBlock Text="打开设置" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Text="Ctrl + ," HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <TextBlock Margin="2,12,0,0" Text="接收控制台内支持 Ctrl+C 复制选中内容，右键菜单可复制全部。"
+                       Style="{StaticResource CaptionTextStyle}" />
+        </StackPanel>
+
+        <Button Grid.Row="2" Content="关闭" Style="{StaticResource SecondaryButtonStyle}" Width="84"
+                HorizontalAlignment="Right" Margin="0,20,0,0" Click="Close_Click" IsCancel="True" />
+    </Grid>
+</Window>

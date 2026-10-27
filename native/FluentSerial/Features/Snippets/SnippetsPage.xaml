@@ -1,0 +1,179 @@
+<UserControl x:Class="FluentSerial.Features.SnippetsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:FluentSerial.Converters"
+             Background="{DynamicResource AppBackgroundBrush}">
+    <UserControl.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+        <Style x:Key="SnippetRowBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,0.5" />
+            <Setter Property="Padding" Value="16,9" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceAltBrush}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="28,24,28,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="快捷指令" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock x:Name="CommandCountText" Margin="10,0,0,0" VerticalAlignment="Center"
+                           Style="{StaticResource CaptionTextStyle}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="导入" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"
+                        Click="Import_Click" />
+                <Button Content="导出" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"
+                        Click="Export_Click" />
+                <Button Style="{StaticResource PrimaryButtonStyle}" Click="NewCommand_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="Segoe Fluent Icons" FontSize="13" Text="&#xE710;" VerticalAlignment="Center" />
+                        <TextBlock Text="新建指令" Margin="6,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,18,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0">
+                <TextBox x:Name="SearchBox" Style="{StaticResource InputTextBoxStyle}" Padding="30,6,10,6"
+                         TextChanged="SearchBox_TextChanged" />
+                <TextBlock x:Name="SearchHint" Text="搜索名称、载荷或描述" Margin="30,0,0,0" VerticalAlignment="Center"
+                           IsHitTestVisible="False" Style="{StaticResource CaptionTextStyle}" />
+                <TextBlock FontFamily="Segoe Fluent Icons" FontSize="13" Text="&#xE721;" Margin="10,0,0,0"
+                           VerticalAlignment="Center" Foreground="{DynamicResource AppTextTertiaryBrush}"
+                           IsHitTestVisible="False" />
+            </Grid>
+            <ComboBox x:Name="GroupFilter" Grid.Column="1" Width="170" Margin="10,0,0,0"
+                      Style="{StaticResource InputComboBoxStyle}" SelectionChanged="GroupFilter_SelectionChanged" />
+            <TextBlock Grid.Column="3" Text="双击指令直接发送" VerticalAlignment="Center"
+                       Style="{StaticResource CaptionTextStyle}" />
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <Border x:Name="ListPanel" Background="{DynamicResource AppSurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0.5" CornerRadius="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="0.5" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="16,0" Height="38">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="64" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="1.3*" />
+                            <ColumnDefinition Width="128" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="指令" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="1" Text="模式" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="2" Text="分组" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="3" Text="载荷" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="4" Text="操作" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                    </Grid>
+                    <Border Grid.Row="1" Style="{StaticResource HairlineStyle}" />
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="CommandList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource SnippetRowBorderStyle}"
+                                            MouseLeftButtonDown="SnippetRow_MouseLeftButtonDown">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="64" />
+                                                <ColumnDefinition Width="120" />
+                                                <ColumnDefinition Width="1.3*" />
+                                                <ColumnDefinition Width="128" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource BodyTextStyle}"
+                                                               FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="★" FontSize="12" Margin="6,0,0,0"
+                                                               Foreground="{DynamicResource AppAccentBrush}"
+                                                               Visibility="{Binding Favorite, Converter={StaticResource BoolToVis}}" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Description}" Margin="0,2,0,0"
+                                                           Style="{StaticResource CaptionTextStyle}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <Border Grid.Column="1" Style="{StaticResource BadgeBorderStyle}"
+                                                    HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding ModeLabel}" FontSize="12"
+                                                           Foreground="{DynamicResource AppTextSecondaryBrush}" />
+                                            </Border>
+                                            <TextBlock Grid.Column="2" Text="{Binding Group}" VerticalAlignment="Center"
+                                                       Margin="0,0,10,0" Style="{StaticResource SecondaryTextStyle}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="3" Text="{Binding PayloadPreview}" VerticalAlignment="Center"
+                                                       Margin="0,0,12,0" Style="{StaticResource MonoTextStyle}"
+                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Payload}" />
+                                            <StackPanel Grid.Column="4" Orientation="Horizontal"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <Button Content="&#xE768;" Style="{StaticResource ListRowButtonStyle}"
+                                                        Tag="{Binding}" Click="SendCommand_Click" ToolTip="发送到串口" />
+                                                <Button Content="&#xE70F;" Style="{StaticResource ListRowButtonStyle}"
+                                                        Tag="{Binding}" Click="EditCommand_Click" ToolTip="编辑指令" />
+                                                <Button Content="&#xE74D;" Style="{StaticResource ListRowButtonStyle}"
+                                                        Foreground="{DynamicResource AppDangerBrush}" Tag="{Binding}"
+                                                        Click="DeleteCommand_Click" ToolTip="删除指令" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center"
+                        Visibility="Collapsed">
+                <TextBlock HorizontalAlignment="Center" FontFamily="Segoe Fluent Icons" FontSize="30"
+                           Foreground="{DynamicResource AppTextTertiaryBrush}" Text="&#xE943;" />
+                <TextBlock x:Name="EmptyTitle" Margin="0,12,0,0" HorizontalAlignment="Center" Text="还没有快捷指令"
+                           Style="{StaticResource BodyTextStyle}" FontWeight="SemiBold" />
+                <TextBlock x:Name="EmptyHint" Margin="0,5,0,0" HorizontalAlignment="Center"
+                           Text="把常用指令保存下来，一键发送到串口" Style="{StaticResource CaptionTextStyle}" />
+                <Button x:Name="EmptyNewButton" Margin="0,16,0,0" Style="{StaticResource PrimaryButtonStyle}"
+                        HorizontalAlignment="Center" Click="NewCommand_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="Segoe Fluent Icons" FontSize="13" Text="&#xE710;" VerticalAlignment="Center" />
+                        <TextBlock Text="新建指令" Margin="6,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

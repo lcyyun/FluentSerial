@@ -1,0 +1,12 @@
+# FluentSerial native build artifacts
+native/**/bin/
+native/**/obj/
+dist/
+data/
+*.log
+*.user
+docs/screenshots/
+.DS_Store
+
+# Smoke test scratch
+tests/.artifacts/

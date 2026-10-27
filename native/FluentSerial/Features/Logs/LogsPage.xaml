@@ -1,0 +1,318 @@
+<UserControl x:Class="FluentSerial.Features.LogsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource AppBackgroundBrush}">
+    <UserControl.Resources>
+        <Style x:Key="LogSegmentStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Border" Background="Transparent" CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background"
+                                        Value="{DynamicResource AppSurfaceHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="Background"
+                                        Value="{DynamicResource AppSelectedBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="LogRowBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,0.5" />
+            <Setter Property="Padding" Value="16,8" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceAltBrush}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="28,24,28,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="数据记录" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock x:Name="CountText" Margin="10,0,0,0" VerticalAlignment="Center"
+                           Style="{StaticResource CaptionTextStyle}" />
+            </StackPanel>
+            <Button Grid.Column="1" Style="{StaticResource SecondaryButtonStyle}" Click="OpenRecordsFolder_Click"
+                    ToolTip="在资源管理器中打开会话记录目录">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock FontFamily="Segoe Fluent Icons" FontSize="13" Text="&#xE8B7;"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="打开记录目录" Margin="6,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="16,11,16,11">
+                <StackPanel>
+                    <TextBlock Text="会话总数" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock x:Name="SessionTotalText" Text="0" Margin="0,4,0,0"
+                               Style="{StaticResource PageTitleStyle}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="16,11,16,11">
+                <StackPanel>
+                    <TextBlock Text="累计接收" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock x:Name="RxTotalText" Text="0 B" Margin="0,4,0,0"
+                               Style="{StaticResource PageTitleStyle}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="16,11,16,11">
+                <StackPanel>
+                    <TextBlock Text="累计发送" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock x:Name="TxTotalText" Text="0 B" Margin="0,4,0,0"
+                               Style="{StaticResource PageTitleStyle}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="6" Style="{StaticResource CardStyle}" Padding="16,11,16,11">
+                <StackPanel>
+                    <TextBlock Text="今日会话" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock x:Name="TodayTotalText" Text="0" Margin="0,4,0,0"
+                               Style="{StaticResource PageTitleStyle}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <ListBox x:Name="SectionTabs" Grid.Row="2" Margin="0,18,0,12" Background="Transparent"
+                 BorderThickness="0" ItemContainerStyle="{StaticResource LogSegmentStyle}"
+                 SelectionChanged="SectionTabs_SelectionChanged" SelectedIndex="0">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBoxItem Content="会话记录" />
+            <ListBoxItem Content="审计事件" />
+        </ListBox>
+
+        <Grid Grid.Row="3">
+            <Border x:Name="SessionsView" Background="{DynamicResource AppSurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0.5" CornerRadius="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="0.5" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="16,0" Height="38">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="104" />
+                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="64" />
+                            <ColumnDefinition Width="60" />
+                            <ColumnDefinition Width="60" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="120" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="时间" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="1" Text="端口 / 预设" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="2" Text="参数" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="3" Text="时长" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="4" Text="RX" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="5" Text="TX" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="6" Text="文件" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="7" Text="操作" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                    </Grid>
+                    <Border Grid.Row="1" Style="{StaticResource HairlineStyle}" />
+                    <Grid Grid.Row="2">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl x:Name="SessionList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource LogRowBorderStyle}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="104" />
+                                                    <ColumnDefinition Width="160" />
+                                                    <ColumnDefinition Width="100" />
+                                                    <ColumnDefinition Width="64" />
+                                                    <ColumnDefinition Width="60" />
+                                                    <ColumnDefinition Width="60" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="120" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding TimeLabel}" VerticalAlignment="Center"
+                                                           Style="{StaticResource MonoTextStyle}"
+                                                           Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding DisplayPort}" Margin="0,0,10,0"
+                                                           VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}"
+                                                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                           ToolTip="{Binding PortName}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding ParamsLabel}" Margin="0,0,8,0"
+                                                           VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}"
+                                                           Foreground="{DynamicResource AppTextSecondaryBrush}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Grid.Column="3" Text="{Binding DurationLabel}"
+                                                           VerticalAlignment="Center"
+                                                           Style="{StaticResource SecondaryTextStyle}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Grid.Column="4" Text="{Binding RxLabel}"
+                                                           VerticalAlignment="Center"
+                                                           Style="{StaticResource SecondaryTextStyle}" />
+                                                <TextBlock Grid.Column="5" Text="{Binding TxLabel}"
+                                                           VerticalAlignment="Center"
+                                                           Style="{StaticResource SecondaryTextStyle}" />
+                                                <TextBlock Grid.Column="6" Text="{Binding FileName}" Margin="0,0,10,0"
+                                                           VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}"
+                                                           Foreground="{DynamicResource AppTextTertiaryBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           ToolTip="{Binding FilePath}" />
+                                                <StackPanel Grid.Column="7" Orientation="Horizontal"
+                                                            HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                    <Button Content="打开" Style="{StaticResource SubtleButtonStyle}"
+                                                            Padding="6,2" FontSize="12" Tag="{Binding}"
+                                                            Click="OpenSessionFile_Click" ToolTip="用默认程序打开记录文件" />
+                                                    <Button Content="定位" Style="{StaticResource SubtleButtonStyle}"
+                                                            Padding="6,2" FontSize="12" Tag="{Binding}"
+                                                            Click="LocateSessionFile_Click" ToolTip="在资源管理器中定位记录文件" />
+                                                    <Button Content="&#xE74D;" Style="{StaticResource ListRowButtonStyle}"
+                                                            Foreground="{DynamicResource AppDangerBrush}" Tag="{Binding}"
+                                                            Click="DeleteSession_Click" ToolTip="删除会话记录" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <TextBlock x:Name="EmptySessionsText" Text="还没有会话记录" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" Style="{StaticResource SecondaryTextStyle}"
+                                   Visibility="Collapsed" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border x:Name="AuditView" Background="{DynamicResource AppSurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0.5" CornerRadius="10"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="0.5" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="16,0" Height="38">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="76" />
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="时间" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="1" Text="级别" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="2" Text="类别" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                        <TextBlock Grid.Column="3" Text="事件" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}" />
+                    </Grid>
+                    <Border Grid.Row="1" Style="{StaticResource HairlineStyle}" />
+                    <Grid Grid.Row="2">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl x:Name="AuditList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource LogRowBorderStyle}"
+                                                ToolTip="{Binding Detail}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="130" />
+                                                    <ColumnDefinition Width="76" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding TimeLabel}" VerticalAlignment="Center"
+                                                           Style="{StaticResource MonoTextStyle}"
+                                                           Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                                                <Border Grid.Column="1" Style="{StaticResource BadgeBorderStyle}"
+                                                        HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding LevelLabel}" FontSize="12">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground"
+                                                                        Value="{DynamicResource AppTextSecondaryBrush}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Level}" Value="Warning">
+                                                                        <Setter Property="Foreground"
+                                                                                Value="{DynamicResource AppWarningBrush}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Level}" Value="Error">
+                                                                        <Setter Property="Foreground"
+                                                                                Value="{DynamicResource AppDangerBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                                <TextBlock Grid.Column="2" Text="{Binding CategoryLabel}"
+                                                           VerticalAlignment="Center"
+                                                           Style="{StaticResource SecondaryTextStyle}" />
+                                                <TextBlock Grid.Column="3" Text="{Binding Message}" Margin="0,0,12,0"
+                                                           VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <TextBlock x:Name="EmptyAuditText" Text="还没有审计事件" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" Style="{StaticResource SecondaryTextStyle}"
+                                   Visibility="Collapsed" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

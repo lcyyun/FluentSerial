@@ -1,0 +1,186 @@
+<UserControl x:Class="FluentSerial.Features.PresetsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:FluentSerial.Converters"
+             Background="{DynamicResource AppBackgroundBrush}">
+    <UserControl.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+    </UserControl.Resources>
+
+    <Grid Margin="28,24,28,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="端口预设" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock x:Name="PresetCountText" Margin="10,0,0,0" VerticalAlignment="Center"
+                           Style="{StaticResource CaptionTextStyle}" />
+            </StackPanel>
+            <Button Grid.Column="1" Style="{StaticResource PrimaryButtonStyle}" Click="NewPreset_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock FontFamily="Segoe Fluent Icons" FontSize="13" Text="&#xE710;" VerticalAlignment="Center" />
+                    <TextBlock Text="新建预设" Margin="6,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,18,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0">
+                <TextBox x:Name="SearchBox" Style="{StaticResource InputTextBoxStyle}" Padding="30,6,10,6"
+                         TextChanged="SearchBox_TextChanged" />
+                <TextBlock x:Name="SearchHint" Text="搜索名称、端口或备注" Margin="30,0,0,0" VerticalAlignment="Center"
+                           IsHitTestVisible="False" Style="{StaticResource CaptionTextStyle}" />
+                <TextBlock FontFamily="Segoe Fluent Icons" FontSize="13" Text="&#xE721;" Margin="10,0,0,0"
+                           VerticalAlignment="Center" Foreground="{DynamicResource AppTextTertiaryBrush}"
+                           IsHitTestVisible="False" />
+            </Grid>
+            <ComboBox x:Name="ScopeFilter" Grid.Column="1" Width="150" Margin="10,0,0,0"
+                      Style="{StaticResource InputComboBoxStyle}" SelectionChanged="ScopeFilter_SelectionChanged">
+                <ComboBoxItem Content="全部预设" Tag="all" />
+                <ComboBoxItem Content="仅收藏" Tag="favorites" />
+            </ComboBox>
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <ScrollViewer x:Name="PresetScroll" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
+                <ItemsControl x:Name="PresetList">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="Card" Style="{StaticResource CardStyle}" Width="316" MinHeight="166"
+                                    Padding="14,13,14,12" Margin="0,0,14,14" Cursor="Hand"
+                                    MouseLeftButtonDown="PresetCard_MouseLeftButtonDown">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Name}" Style="{StaticResource BodyTextStyle}"
+                                                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" Text="★" FontSize="12" Margin="6,0,0,0"
+                                                   Foreground="{DynamicResource AppAccentBrush}"
+                                                   Visibility="{Binding Favorite, Converter={StaticResource BoolToVis}}" />
+                                    </Grid>
+
+                                    <TextBlock Grid.Row="1" Margin="0,3,0,0" Text="{Binding PortLabel}"
+                                               Style="{StaticResource MonoTextStyle}" TextTrimming="CharacterEllipsis" />
+
+                                    <Border Grid.Row="2" Style="{StaticResource HairlineStyle}" Margin="0,10,0,10" />
+
+                                    <Grid Grid.Row="3">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,3">
+                                            <TextBlock Text="参数" Style="{StaticResource CaptionTextStyle}" Width="32" />
+                                            <TextBlock Text="{Binding ParamsLabel}" Style="{StaticResource SecondaryTextStyle}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,3">
+                                            <TextBlock Text="流控" Style="{StaticResource CaptionTextStyle}" Width="32" />
+                                            <TextBlock Text="{Binding FlowLabel}" Style="{StaticResource SecondaryTextStyle}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
+                                            <TextBlock Text="模式" Style="{StaticResource CaptionTextStyle}" Width="32" />
+                                            <TextBlock Text="{Binding ModeLabel}" Style="{StaticResource SecondaryTextStyle}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
+                                            <TextBlock Text="最近" Style="{StaticResource CaptionTextStyle}" Width="32" />
+                                            <TextBlock Text="{Binding LastUsedLabel}" Style="{StaticResource SecondaryTextStyle}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Grid.Row="4" Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="编码" Style="{StaticResource CaptionTextStyle}" Margin="0,0,5,0" />
+                                            <TextBlock Text="{Binding EncodingLabel}" Style="{StaticResource CaptionTextStyle}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <Button Style="{StaticResource PrimaryButtonStyle}" Padding="10,3" MinHeight="26"
+                                                    FontSize="12" Tag="{Binding}" Click="ConnectPreset_Click" Margin="0,0,6,0"
+                                                    ToolTip="使用此预设连接串口">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock FontFamily="Segoe Fluent Icons" FontSize="12" Text="&#xE768;"
+                                                               VerticalAlignment="Center" />
+                                                    <TextBlock Text="连接" Margin="5,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Content="&#xE70F;" Style="{StaticResource ListRowButtonStyle}"
+                                                    Tag="{Binding}" Click="EditPreset_Click" ToolTip="编辑预设" />
+                                            <Button Content="&#xE74D;" Style="{StaticResource ListRowButtonStyle}"
+                                                    Foreground="{DynamicResource AppDangerBrush}" Tag="{Binding}"
+                                                    Click="DeletePreset_Click" ToolTip="删除预设" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <Trigger SourceName="Card" Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Card" Property="Background"
+                                            Value="{DynamicResource AppSurfaceHoverBrush}" />
+                                    <Setter TargetName="Card" Property="BorderBrush"
+                                            Value="{DynamicResource AppBorderStrongBrush}" />
+                                </Trigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center"
+                        Visibility="Collapsed">
+                <TextBlock HorizontalAlignment="Center" FontFamily="Segoe Fluent Icons" FontSize="30"
+                           Foreground="{DynamicResource AppTextTertiaryBrush}" Text="&#xE8F1;" />
+                <TextBlock x:Name="EmptyTitle" Margin="0,12,0,0" HorizontalAlignment="Center" Text="还没有端口预设"
+                           Style="{StaticResource BodyTextStyle}" FontWeight="SemiBold" />
+                <TextBlock x:Name="EmptyHint" Margin="0,5,0,0" HorizontalAlignment="Center"
+                           Text="保存常用的串口参数，连接时一键打开设备" Style="{StaticResource CaptionTextStyle}" />
+                <Button x:Name="EmptyNewButton" Margin="0,16,0,0" Style="{StaticResource PrimaryButtonStyle}"
+                        HorizontalAlignment="Center" Click="NewPreset_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="Segoe Fluent Icons" FontSize="13" Text="&#xE710;" VerticalAlignment="Center" />
+                        <TextBlock Text="新建预设" Margin="6,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>
