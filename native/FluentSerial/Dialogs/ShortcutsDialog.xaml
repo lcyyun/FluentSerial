@@ -40,6 +40,11 @@
                     </Grid>
                     <Border Style="{StaticResource HairlineStyle}" />
                     <Grid Height="34">
+                        <TextBlock Text="保存接收控制台" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Text="Ctrl + S" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}" />
+                    </Grid>
+                    <Border Style="{StaticResource HairlineStyle}" />
+                    <Grid Height="34">
                         <TextBlock Text="刷新串口列表" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" />
                         <TextBlock Text="F5" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}" />
                     </Grid>

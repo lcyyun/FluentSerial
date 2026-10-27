@@ -193,7 +193,7 @@ public partial class MainWindow : FluentWindow
             case SerialLinkState.Open:
                 SidebarConnectLabel.Text = "关闭串口";
                 SidebarConnectGlyph.Text = "\uE769";
-                SidebarStatusText.Text = $"{serial.PortLabel} · {serial.ParamsLabel}";
+                SidebarStatusText.Text = $"{serial.PortLabel}  {serial.ParamsLabel}";
                 SidebarStatusDot.Fill = (Brush)FindResource("AppSuccessBrush");
                 break;
             case SerialLinkState.Opening:
@@ -247,6 +247,16 @@ public partial class MainWindow : FluentWindow
                 case Key.O:
                     Navigate("terminal");
                     Terminal?.ToggleConnect();
+                    e.Handled = true;
+                    return;
+                case Key.L:
+                    Navigate("terminal");
+                    Terminal?.ClearConsoleFromShortcut();
+                    e.Handled = true;
+                    return;
+                case Key.S:
+                    Navigate("terminal");
+                    Terminal?.SaveConsoleFromShortcut();
                     e.Handled = true;
                     return;
             }

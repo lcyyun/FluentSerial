@@ -111,7 +111,7 @@ public sealed class SerialPortInfo
     public string Name { get; }
     public string Description { get; }
     public bool IsDemo => SerialPortCatalog.IsDemo(Name);
-    public string Label => string.IsNullOrWhiteSpace(Description) ? Name : $"{Name} · {Description}";
+    public string Label => string.IsNullOrWhiteSpace(Description) ? Name : $"{Name}  {Description}";
 }
 
 /// <summary>One chunk of data or one system line in the serial console.</summary>

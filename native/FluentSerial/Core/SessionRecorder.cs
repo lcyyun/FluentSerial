@@ -123,7 +123,7 @@ public sealed class SessionRecorder : IDisposable
         var options = _options;
         _writer.WriteLine("FluentSerial 串口会话记录");
         _writer.WriteLine($"端口: {options.PortName}{(options.IsDemo ? "（内置回环模拟器）" : string.Empty)}");
-        _writer.WriteLine($"参数: {options.ParamsLabel} · {FormatText.HandshakeLabel(options.Handshake)}");
+        _writer.WriteLine($"参数: {options.ParamsLabel}  {FormatText.HandshakeLabel(options.Handshake)}");
         if (!string.IsNullOrWhiteSpace(options.ProfileName))
             _writer.WriteLine($"配置: {options.ProfileName}");
         _writer.WriteLine($"编码: {FormatText.EncodingLabel(options.Encoding)}");

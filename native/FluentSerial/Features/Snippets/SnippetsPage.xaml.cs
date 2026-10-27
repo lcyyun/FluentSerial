@@ -238,6 +238,7 @@ public partial class SnippetsPage : UserControl, IActivatablePage
             Title = "导出快捷指令",
             Filter = "JSON 文件|*.json",
             DefaultExt = ".json",
+            InitialDirectory = AppServices.Paths.ExportsDirectory,
             FileName = $"fluentserial-commands-{DateTime.Now:yyyyMMdd}.json"
         };
         if (picker.ShowDialog() != true) return;

@@ -382,7 +382,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
             options.RememberIn(Settings);
             AppServices.Store.Save();
             ResetConsole();
-            AddSystemLine($"已打开 {AppServices.Serial.PortLabel} · {AppServices.Serial.ParamsLabel} · {FormatText.EncodingLabel(_encodingName)}", ConsoleTone.Success);
+            AddSystemLine($"已打开 {AppServices.Serial.PortLabel}  {AppServices.Serial.ParamsLabel}  {FormatText.EncodingLabel(_encodingName)}", ConsoleTone.Success);
             SendBox.Focus();
         }
         else if (string.IsNullOrWhiteSpace(ConnectionErrorText.Text))
@@ -623,12 +623,12 @@ public partial class TerminalPage : UserControl, IActivatablePage
         ConnectButtonGlyph.Text = open ? "\uE769" : "\uE768";
 
         HeaderStatusText.Text = open
-            ? $"{serial.PortLabel} · {serial.ParamsLabel}"
+            ? $"{serial.PortLabel}  {serial.ParamsLabel}"
             : busy ? "正在打开串口" : "选择端口后打开，或使用 DEMO 回环";
 
         ConsoleTitle.Text = open ? "已连接" : state == SerialLinkState.Error ? "连接失败" : "未连接";
         ConsoleMeta.Text = open
-            ? $"{serial.PortLabel} · {serial.ParamsLabel} · {FormatText.EncodingLabel(_encodingName)}"
+            ? $"{serial.PortLabel}  {serial.ParamsLabel}  {FormatText.EncodingLabel(_encodingName)}"
             : state == SerialLinkState.Error
                 ? serial.LastError
                 : "选择端口后打开";
@@ -636,7 +636,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
         ConsoleDot.Fill = (Brush)FindResource(open ? "ConsoleOkBrush" : state == SerialLinkState.Error ? "ConsoleErrorBrush" : "ConsoleMetaBrush");
         StatusDot.Fill = (Brush)FindResource(open ? "AppSuccessBrush" : state == SerialLinkState.Error ? "AppDangerBrush" : "AppTextTertiaryBrush");
         StatusText.Text = open
-            ? $"已连接 {serial.PortLabel} · {serial.ParamsLabel}"
+            ? $"已连接 {serial.PortLabel}  {serial.ParamsLabel}"
             : state == SerialLinkState.Error ? "串口异常，请检查连接" : "未连接串口";
 
         if (open) ConnectionErrorText.Visibility = Visibility.Collapsed;
@@ -826,7 +826,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
         if (_paused)
         {
             if (ConsoleMeta is not null)
-                ConsoleMeta.Text = $"已暂停 · 缓冲 {_pendingLines.Count} 行";
+                ConsoleMeta.Text = $"已暂停  缓冲 {_pendingLines.Count} 行";
             return;
         }
 
@@ -1114,7 +1114,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
         PauseButton.Content = _paused ? "继续" : "暂停";
         if (_paused)
         {
-            ConsoleMeta.Text = $"已暂停 · 缓冲 {_pendingLines.Count} 行";
+            ConsoleMeta.Text = $"已暂停  缓冲 {_pendingLines.Count} 行";
         }
         else
         {
@@ -1184,7 +1184,8 @@ public partial class TerminalPage : UserControl, IActivatablePage
             FileName = $"serial-console-{DateTime.Now:yyyyMMdd-HHmmss}.log",
             Filter = "日志文件 (*.log)|*.log|文本文件 (*.txt)|*.txt|所有文件 (*.*)|*.*",
             DefaultExt = ".log",
-            AddExtension = true
+            AddExtension = true,
+            InitialDirectory = AppServices.Paths.ExportsDirectory
         };
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
         try
@@ -1226,6 +1227,8 @@ public partial class TerminalPage : UserControl, IActivatablePage
 
     private void SendBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Let the IME consume Enter while a Chinese/Japanese composition is active.
+        if (e.Key == Key.ImeProcessed || e.ImeProcessedKey == Key.Enter) return;
         if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
         {
             DoSend();
@@ -1482,7 +1485,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
                 Content = command.Name,
                 Tag = command,
                 Margin = new Thickness(0, 0, 6, 0),
-                ToolTip = $"{command.Summary}\n{command.ModeLabel} · 行尾 {command.EndingLabel}"
+                ToolTip = $"{command.Summary}\n{command.ModeLabel}  行尾 {command.EndingLabel}"
             };
             button.Click += QuickCommand_Click;
             QuickCommandPanel.Children.Add(button);
@@ -1518,8 +1521,12 @@ public partial class TerminalPage : UserControl, IActivatablePage
             return;
         }
 
-        var bytes = SerialCodec.BuildPayload(command.Payload, command.Mode, command.Ending, command.Checksum,
-            _encodingName, Settings.UseEscapes);
+        if (!SerialCodec.TryBuildPayload(command.Payload, command.Mode, command.Ending, command.Checksum,
+                _encodingName, Settings.UseEscapes, out var bytes, out var error))
+        {
+            SetTransientHint($"指令“{command.Name}”无法发送：{error}", error: true);
+            return;
+        }
         if (AppServices.Serial.Send(bytes))
             SetTransientHint($"已发送指令“{command.Name}”（{bytes.Length} 字节）");
         else
@@ -1543,17 +1550,29 @@ public partial class TerminalPage : UserControl, IActivatablePage
         TxTextRadio.IsChecked = true;
         SelectChoice(EndingBox, LineEnding.CrLf);
         await Task.Delay(450);
-        SendRawForCapture(SerialCodec.EncodeText("AT+VER?", "ascii", false));
+        if (RxHexRadio.IsChecked == true)
+        {
+            // Keep the HEX screenshot focused on one exchange instead of a scrolled history.
+            ResetConsole();
+            AddSystemLine($"已打开 {AppServices.Serial.PortLabel}  {AppServices.Serial.ParamsLabel}  HEX 视图", ConsoleTone.Success);
+            await Task.Delay(200);
+        }
+        SendRawForCapture("AT+VER?");
         await Task.Delay(500);
-        SendRawForCapture(SerialCodec.EncodeText("ATI", "ascii", false));
+        SendRawForCapture("ATI");
         await Task.Delay(500);
         UpdateSendSize();
     }
 
-    private void SendRawForCapture(byte[] body)
+    private void SendRawForCapture(string text)
     {
         if (!AppServices.Serial.IsOpen) return;
-        AppServices.Serial.Send(body);
+        var body = SerialCodec.EncodeText(text, "ascii", false);
+        var ending = SerialCodec.LineEndingBytes(LineEnding.CrLf);
+        var payload = new byte[body.Length + ending.Length];
+        body.CopyTo(payload, 0);
+        ending.CopyTo(payload, body.Length);
+        AppServices.Serial.Send(payload);
     }
 
     // ---------------------------------------------------------------- UI smoke hooks
@@ -1584,4 +1603,10 @@ public partial class TerminalPage : UserControl, IActivatablePage
     }
 
     public void CloseForSmoke() => AppServices.Serial.Close("UI 冒烟测试");
+
+    /// <summary>Global Ctrl+L invokes the same clear flow as the console toolbar button.</summary>
+    public void ClearConsoleFromShortcut() => ClearConsole_Click(this, new RoutedEventArgs());
+
+    /// <summary>Global Ctrl+S invokes the same save flow as the console toolbar button.</summary>
+    public void SaveConsoleFromShortcut() => SaveConsole_Click(this, new RoutedEventArgs());
 }

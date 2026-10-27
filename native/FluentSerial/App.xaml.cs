@@ -161,7 +161,9 @@ public partial class App : Application
         Window? dialog = _dialog switch
         {
             "shortcuts" => new Dialogs.ShortcutsDialog { Owner = window },
-            "preset" => new Dialogs.PresetDialog(AppServices.Data.Profiles, AppServices.Data.Profiles.FirstOrDefault(p => p.Favorite))
+            "preset" => new Dialogs.PresetDialog(AppServices.Data.Profiles,
+                AppServices.Data.Profiles.FirstOrDefault(p => p.PortName == "DEMO")
+                ?? AppServices.Data.Profiles.FirstOrDefault(p => p.Favorite))
             {
                 Owner = window
             },
@@ -243,7 +245,7 @@ public partial class App : Application
                 var rxBefore = AppServices.Serial.BytesRx;
                 var opened = await terminal.OpenDemoForSmokeAsync();
                 Check("打开 DEMO 串口", opened && AppServices.Serial.IsOpen,
-                    $"{AppServices.Serial.PortLabel} · {AppServices.Serial.State}");
+                    $"{AppServices.Serial.PortLabel}  {AppServices.Serial.State}");
 
                 await Task.Delay(700);
                 Check("接收演示数据", AppServices.Serial.BytesRx > rxBefore,

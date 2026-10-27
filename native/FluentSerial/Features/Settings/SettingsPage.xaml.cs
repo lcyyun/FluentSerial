@@ -149,7 +149,7 @@ public partial class SettingsPage : UserControl, IActivatablePage
         AppServices.MainWindow?.RefreshThemeUi();
         AppServices.MainWindow?.Terminal?.ApplySettings();
         AppServices.Audit.Add(AuditLevel.Info, "settings", "更新应用设置");
-        StatusText.Text = $"已保存 · {DateTime.Now:HH:mm:ss}";
+        StatusText.Text = $"已保存  {DateTime.Now:HH:mm:ss}";
         StatusText.Foreground = (System.Windows.Media.Brush)FindResource("AppSuccessBrush");
     }
 

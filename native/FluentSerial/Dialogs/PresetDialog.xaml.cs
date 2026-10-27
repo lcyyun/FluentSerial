@@ -71,7 +71,12 @@ public partial class PresetDialog : Window
         PortBox.Items.Clear();
         PortBox.Items.Add(new ComboBoxItem { Content = "自动选择", Tag = string.Empty });
         foreach (var port in SerialPortCatalog.GetPorts())
-            PortBox.Items.Add(new ComboBoxItem { Content = port.Label, Tag = port.Name });
+            PortBox.Items.Add(new ComboBoxItem
+            {
+                Content = port.IsDemo ? "DEMO 内置回环" : port.Label,
+                Tag = port.Name,
+                ToolTip = port.Label
+            });
 
         if (!string.IsNullOrWhiteSpace(preferredPort) &&
             !PortBox.Items.OfType<ComboBoxItem>()

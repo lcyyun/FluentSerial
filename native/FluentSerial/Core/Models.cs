@@ -264,7 +264,7 @@ public sealed class SerialSessionRecord : ObservableObject
     public string FilePath { get; set; } = string.Empty;
     public string Note { get; set; } = string.Empty;
 
-    [JsonIgnore] public string DisplayPort => string.IsNullOrWhiteSpace(ProfileName) ? PortName : $"{ProfileName} · {PortName}";
+    [JsonIgnore] public string DisplayPort => string.IsNullOrWhiteSpace(ProfileName) ? PortName : $"{ProfileName}  {PortName}";
     [JsonIgnore] public string TimeLabel => StartedAt.ToString("MM-dd HH:mm:ss");
     [JsonIgnore] public string DurationLabel => FormatText.Duration(((EndedAt ?? DateTime.Now) - StartedAt).TotalMilliseconds);
     [JsonIgnore] public string RxLabel => FormatText.Bytes(BytesRx);
