@@ -33,7 +33,10 @@ public sealed class AppPaths
         var label = string.IsNullOrWhiteSpace(profileName) ? portName : $"{profileName}-{portName}";
         var safe = string.Concat(label.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
         if (string.IsNullOrWhiteSpace(safe)) safe = "session";
-        return Path.Combine(LogsDirectory, $"{DateTime.Now:yyyyMMdd-HHmmss}-{safe}.log");
+        // Reconnects can occur within one clock tick. A unique suffix prevents a later
+        // session from replacing a previous recording, even across app instances.
+        if (safe.Length > 80) safe = safe[..80];
+        return Path.Combine(LogsDirectory, $"{DateTime.Now:yyyyMMdd-HHmmss-fff}-{safe}-{Guid.NewGuid():N}.log");
     }
 }
 

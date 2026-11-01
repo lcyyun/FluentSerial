@@ -9,27 +9,33 @@
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="设置" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock x:Name="StatusText" Margin="12,0,0,0" VerticalAlignment="Center"
-                           Style="{StaticResource CaptionTextStyle}" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="设置" Style="{StaticResource PageTitleStyle}" VerticalAlignment="Center" />
+            <TextBlock x:Name="StatusText" Grid.Column="1" Margin="12,0,12,0" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                       Style="{StaticResource CaptionTextStyle}" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="DiscardButton" Content="撤销修改" Style="{StaticResource SubtleButtonStyle}"
+                        Margin="0,0,8,0" IsEnabled="False" Click="Discard_Click" />
                 <Button Content="恢复默认" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"
                         Click="RestoreDefaults_Click" />
-                <Button Content="保存" Style="{StaticResource PrimaryButtonStyle}" Width="88" Click="Save_Click" />
+                <Button Content="保存" Style="{StaticResource PrimaryButtonStyle}" Width="88" Click="Save_Click" ToolTip="保存设置 (Ctrl+S)" />
             </StackPanel>
         </Grid>
 
         <ScrollViewer Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
-            <StackPanel MaxWidth="820" HorizontalAlignment="Center">
+            <StackPanel MaxWidth="820" HorizontalAlignment="Stretch">
                 <!-- Appearance -->
                 <Border Style="{StaticResource CardStyle}" Padding="18">
                     <StackPanel>
                         <TextBlock Text="外观" Style="{StaticResource SectionTitleStyle}" />
                         <Grid Margin="0,14,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="230" />
+                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="16" />
                                 <ColumnDefinition Width="140" />
                                 <ColumnDefinition Width="16" />
@@ -41,7 +47,7 @@
                             </StackPanel>
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="控制台字号" Style="{StaticResource FormLabelStyle}" />
-                                <TextBox x:Name="FontSizeBox" Style="{StaticResource InputTextBoxStyle}" />
+                                <TextBox x:Name="FontSizeBox" Style="{StaticResource InputTextBoxStyle}" ToolTip="9–24，可输入小数" />
                             </StackPanel>
                             <StackPanel Grid.Column="4">
                                 <TextBlock Text="控制台字体" Style="{StaticResource FormLabelStyle}" />
@@ -59,9 +65,9 @@
                         <TextBlock Text="接收" Style="{StaticResource SectionTitleStyle}" />
                         <Grid Margin="0,14,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="250" />
+                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="16" />
-                                <ColumnDefinition Width="250" />
+                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="16" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
@@ -75,7 +81,7 @@
                             </StackPanel>
                             <StackPanel Grid.Column="4">
                                 <TextBlock Text="控制台最大行数" Style="{StaticResource FormLabelStyle}" />
-                                <TextBox x:Name="MaxLinesBox" Style="{StaticResource InputTextBoxStyle}" />
+                                <TextBox x:Name="MaxLinesBox" Style="{StaticResource InputTextBoxStyle}" ToolTip="200–20000 行，超出后移除最早的数据" />
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,16,0,0">
@@ -105,9 +111,9 @@
                         <TextBlock Text="发送" Style="{StaticResource SectionTitleStyle}" />
                         <Grid Margin="0,14,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="250" />
+                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="16" />
-                                <ColumnDefinition Width="250" />
+                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="16" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
@@ -121,7 +127,7 @@
                             </StackPanel>
                             <StackPanel Grid.Column="4">
                                 <TextBlock Text="定时发送间隔（ms）" Style="{StaticResource FormLabelStyle}" />
-                                <TextBox x:Name="AutoSendIntervalBox" Style="{StaticResource InputTextBoxStyle}" />
+                                <TextBox x:Name="AutoSendIntervalBox" Style="{StaticResource InputTextBoxStyle}" ToolTip="50–60000 毫秒" />
                             </StackPanel>
                         </Grid>
                         <CheckBox x:Name="UseEscapesCheck" Content="文本模式启用 \r \n \t \xNN 转义序列" Margin="0,16,0,0" />

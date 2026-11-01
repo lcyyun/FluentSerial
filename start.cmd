@@ -2,10 +2,10 @@
 setlocal
 cd /d "%~dp0"
 
+if exist "dist\FluentSerial-native-win-x64\FluentSerial.exe" goto :runpublished
+
 where dotnet >nul 2>nul
 if errorlevel 1 goto :nodotnet
-
-if exist "dist\FluentSerial-native-win-x64\FluentSerial.exe" goto :runpublished
 
 echo [FluentSerial] Building native app...
 dotnet build "native\FluentSerial\FluentSerial.csproj" -c Release

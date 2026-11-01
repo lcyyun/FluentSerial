@@ -8,7 +8,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="28,24,28,20">
+    <Grid Margin="22,20,22,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -19,12 +19,13 @@
 
         <!-- Page header -->
         <Grid Grid.Row="0">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center">
                 <TextBlock Text="串口终端" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock x:Name="HeaderStatusText" Margin="12,0,0,0" VerticalAlignment="Center"
+                <TextBlock x:Name="HeaderStatusText" Margin="0,4,12,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                            Style="{StaticResource CaptionTextStyle}" />
             </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Button x:Name="RefreshPortsButton" Style="{StaticResource SecondaryButtonStyle}"
                         Margin="0,0,8,0" Click="RefreshPorts_Click" ToolTip="重新枚举串口设备">
                     <StackPanel Orientation="Horizontal">
@@ -43,104 +44,61 @@
             </StackPanel>
         </Grid>
 
-        <!-- Connection parameters -->
-        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="16,13,16,12" Margin="0,16,0,0">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <Grid Grid.Row="0">
+        <!-- Common parameters stay visible; advanced settings are expandable. -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="14,12" Margin="0,14,0,0">
+            <StackPanel>
+                <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="302" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="108" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="78" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="122" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="96" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="140" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" /><ColumnDefinition Width="122" />
+                        <ColumnDefinition Width="138" /><ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="串口" Style="{StaticResource ConnectionLabelStyle}" />
-                        <ComboBox x:Name="PortBox" Style="{StaticResource InputComboBoxStyle}"
-                                  SelectionChanged="PortBox_SelectionChanged">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
+                    <StackPanel Margin="0,0,12,0">
+                        <TextBlock Text="串口设备" Style="{StaticResource ConnectionLabelStyle}" />
+                        <ComboBox x:Name="PortBox" Style="{StaticResource InputComboBoxStyle}" MinHeight="32" AutomationProperties.Name="串口设备" SelectionChanged="PortBox_SelectionChanged">
+                            <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label}" ToolTip="{Binding Label}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.ItemTemplate>
                         </ComboBox>
                     </StackPanel>
-                    <StackPanel Grid.Column="2">
+                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
                         <TextBlock Text="波特率" Style="{StaticResource ConnectionLabelStyle}" />
-                        <ComboBox x:Name="BaudBox" Style="{StaticResource EditableComboBoxStyle}"
-                                  IsTextSearchEnabled="False" />
+                        <ComboBox x:Name="BaudBox" Style="{StaticResource EditableComboBoxStyle}" MinHeight="32" IsTextSearchEnabled="False" AutomationProperties.Name="波特率" ToolTip="支持自定义，范围 1–4000000" />
                     </StackPanel>
-                    <StackPanel Grid.Column="4">
-                        <TextBlock Text="数据位" Style="{StaticResource ConnectionLabelStyle}" />
-                        <ComboBox x:Name="DataBitsBox" Style="{StaticResource InputComboBoxStyle}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="6">
-                        <TextBlock Text="校验" Style="{StaticResource ConnectionLabelStyle}" />
-                        <ComboBox x:Name="ParityBox" Style="{StaticResource InputComboBoxStyle}"
-                                  />
-                    </StackPanel>
-                    <StackPanel Grid.Column="8">
-                        <TextBlock Text="停止位" Style="{StaticResource ConnectionLabelStyle}" />
-                        <ComboBox x:Name="StopBitsBox" Style="{StaticResource InputComboBoxStyle}"
-                                  />
-                    </StackPanel>
-                    <StackPanel Grid.Column="10">
-                        <TextBlock Text="流控" Style="{StaticResource ConnectionLabelStyle}" />
-                        <ComboBox x:Name="HandshakeBox" Style="{StaticResource InputComboBoxStyle}"
-                                  />
-                    </StackPanel>
-                    <TextBlock x:Name="PortHintText" Grid.Column="11" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                               Margin="12,0,0,5" Style="{StaticResource CaptionTextStyle}" Text="未检测到串口时可使用 DEMO" />
-                </Grid>
-
-                <Grid Grid.Row="1" Margin="0,11,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="140" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0">
+                    <StackPanel Grid.Column="2" Margin="0,0,12,0">
                         <TextBlock Text="字符编码" Style="{StaticResource ConnectionLabelStyle}" />
-                        <ComboBox x:Name="EncodingBox" Style="{StaticResource InputComboBoxStyle}"
-                                  SelectionChanged="EncodingBox_SelectionChanged" />
+                        <ComboBox x:Name="EncodingBox" Style="{StaticResource InputComboBoxStyle}" MinHeight="32" SelectionChanged="EncodingBox_SelectionChanged" AutomationProperties.Name="字符编码" />
                     </StackPanel>
-
-                    <CheckBox x:Name="DtrCheck" Grid.Column="1" Content="DTR" Margin="18,20,0,0"
-                              VerticalAlignment="Center" Checked="DtrRts_Changed" Unchecked="DtrRts_Changed" />
-                    <CheckBox x:Name="RtsCheck" Grid.Column="2" Content="RTS" Margin="18,20,0,0"
-                              VerticalAlignment="Center" Checked="DtrRts_Changed" Unchecked="DtrRts_Changed" />
-                    <Button x:Name="BreakButton" Grid.Column="3" Content="发送 Break" Style="{StaticResource SubtleButtonStyle}"
-                            Margin="20,20,0,0" Click="Break_Click" ToolTip="拉低 TX 约 200 毫秒" />
-
-                    <StackPanel Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Left" Margin="12,20,0,0">
-                        <Button x:Name="ResetCountersButton" Content="重置计数" Style="{StaticResource LinkButtonStyle}"
-                                VerticalAlignment="Center" Click="ResetCounters_Click" />
-                        <Button x:Name="AutoReconnectHintButton" Content="没有硬件？使用 DEMO 回环" Style="{StaticResource LinkButtonStyle}"
-                                VerticalAlignment="Center" Margin="10,0,0,0" Click="UseDemo_Click" />
-                    </StackPanel>
-
-                    <TextBlock x:Name="ConnectionErrorText" Grid.Column="5" VerticalAlignment="Center" Margin="16,20,0,0"
-                               Foreground="{DynamicResource AppDangerBrush}" FontSize="12"
-                               TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
+                    <Button x:Name="AdvancedButton" Grid.Column="3" Content="高级参数 ▾" VerticalAlignment="Bottom" Style="{StaticResource SubtleButtonStyle}" Click="Advanced_Click" />
                 </Grid>
-            </Grid>
+                <WrapPanel x:Name="AdvancedPanel" Margin="0,12,0,0" Visibility="Collapsed">
+                    <StackPanel Width="78" Margin="0,0,12,6">
+                        <TextBlock Text="数据位" Style="{StaticResource ConnectionLabelStyle}" />
+                        <ComboBox x:Name="DataBitsBox" Style="{StaticResource InputComboBoxStyle}" MinHeight="32" AutomationProperties.Name="数据位" />
+                    </StackPanel>
+                    <StackPanel Width="108" Margin="0,0,12,6">
+                        <TextBlock Text="校验" Style="{StaticResource ConnectionLabelStyle}" />
+                        <ComboBox x:Name="ParityBox" Style="{StaticResource InputComboBoxStyle}" MinHeight="32" AutomationProperties.Name="校验" />
+                    </StackPanel>
+                    <StackPanel Width="90" Margin="0,0,12,6">
+                        <TextBlock Text="停止位" Style="{StaticResource ConnectionLabelStyle}" />
+                        <ComboBox x:Name="StopBitsBox" Style="{StaticResource InputComboBoxStyle}" MinHeight="32" AutomationProperties.Name="停止位" />
+                    </StackPanel>
+                    <StackPanel Width="145" Margin="0,0,12,6">
+                        <TextBlock Text="流控" Style="{StaticResource ConnectionLabelStyle}" />
+                        <ComboBox x:Name="HandshakeBox" Style="{StaticResource InputComboBoxStyle}" MinHeight="32" SelectionChanged="Handshake_Changed" AutomationProperties.Name="流控" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Height="53" Margin="0,0,0,6">
+                        <CheckBox MinWidth="0" x:Name="DtrCheck" Content="DTR" Margin="0,20,12,0" VerticalAlignment="Center" Checked="DtrRts_Changed" Unchecked="DtrRts_Changed" />
+                        <CheckBox MinWidth="0" x:Name="RtsCheck" Content="RTS" Margin="0,20,8,0" VerticalAlignment="Center" Checked="DtrRts_Changed" Unchecked="DtrRts_Changed" />
+                        <Button x:Name="BreakButton" Content="发送 Break" Style="{StaticResource SubtleButtonStyle}" Margin="0,20,0,0" Click="Break_Click" ToolTip="拉低 TX 约 200 毫秒" />
+                    </StackPanel>
+                </WrapPanel>
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock x:Name="PortHintText" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
+                    <Button x:Name="ResetCountersButton" Grid.Column="1" Content="重置计数" Style="{StaticResource LinkButtonStyle}" Margin="8,0" Click="ResetCounters_Click" ToolTip="重置显示计数，会话累计记录保留" />
+                    <Button x:Name="AutoReconnectHintButton" Grid.Column="2" Content="体验 DEMO 回环 →" Style="{StaticResource LinkButtonStyle}" Click="UseDemo_Click" />
+                </Grid>
+                <TextBlock x:Name="ConnectionErrorText" Margin="0,6,0,0" Foreground="{DynamicResource AppDangerBrush}" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" />
+            </StackPanel>
         </Border>
 
         <!-- Receive console -->
@@ -149,13 +107,15 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0" Background="{DynamicResource AppTerminalBarBrush}" CornerRadius="10,10,0,0"
                         Padding="13,7,10,7">
                     <Grid>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,0,7">
                             <Ellipse x:Name="ConsoleDot" Width="7" Height="7" Fill="{DynamicResource ConsoleMetaBrush}"
                                      VerticalAlignment="Center" />
                             <TextBlock x:Name="ConsoleTitle" Text="未连接" Margin="8,0,0,0"
@@ -165,7 +125,8 @@
                                        Foreground="{DynamicResource ConsoleMetaBrush}" FontSize="12"
                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <WrapPanel Grid.Row="1">
+                            <CheckBox x:Name="AutoScrollCheck" Content="跟随最新" Style="{StaticResource ConsoleCheckBoxStyle}" IsChecked="True" Click="AutoScroll_Click" Margin="0,0,14,0" />
                             <CheckBox x:Name="TimestampCheck" Content="时间戳" Style="{StaticResource ConsoleCheckBoxStyle}"
                                       IsChecked="True" Click="DisplayOption_Click" />
                             <CheckBox x:Name="ShowTxCheck" Content="显示发送" Style="{StaticResource ConsoleCheckBoxStyle}"
@@ -188,11 +149,24 @@
                                     Click="SaveConsole_Click" />
                             <Button Content="复制" Style="{StaticResource ConsoleButtonStyle}" Margin="6,0,0,0"
                                     Click="CopyConsole_Click" />
-                        </StackPanel>
+                            <Button Content="查找" Style="{StaticResource ConsoleButtonStyle}" Margin="6,0,0,0" Click="FindConsole_Click" ToolTip="查找控制台 (Ctrl+F)" />
+                        </WrapPanel>
                     </Grid>
                 </Border>
 
-                <RichTextBox x:Name="ConsoleBox" Grid.Row="1" Style="{StaticResource ConsoleRichTextBoxStyle}"
+                <Border x:Name="SearchBar" Grid.Row="1" Background="{DynamicResource AppTerminalBarBrush}" Padding="12,4,12,8" Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBox x:Name="ConsoleSearchBox" Style="{StaticResource InputTextBoxStyle}" AutomationProperties.Name="查找控制台" TextChanged="ConsoleSearch_TextChanged" PreviewKeyDown="ConsoleSearch_PreviewKeyDown" ToolTip="Enter 下一个，Shift+Enter 上一个" />
+                        <TextBlock x:Name="SearchResultText" Grid.Column="1" Foreground="{DynamicResource ConsoleMetaBrush}" FontSize="12" VerticalAlignment="Center" Margin="10,0" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Button Content="上一个" Style="{StaticResource ConsoleButtonStyle}" Click="FindPrevious_Click" />
+                            <Button Content="下一个" Style="{StaticResource ConsoleButtonStyle}" Click="FindNext_Click" />
+                            <Button Content="关闭" Style="{StaticResource ConsoleButtonStyle}" Click="CloseSearch_Click" ToolTip="Esc" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <RichTextBox x:Name="ConsoleBox" Grid.Row="2" AutomationProperties.Name="接收控制台" Style="{StaticResource ConsoleRichTextBoxStyle}"
                              Background="{DynamicResource AppTerminalBrush}" BorderThickness="0"
                              PreviewKeyDown="Console_PreviewKeyDown">
                     <RichTextBox.ContextMenu>
@@ -206,20 +180,16 @@
                     </RichTextBox.ContextMenu>
                 </RichTextBox>
 
-                <Grid x:Name="EmptyState" Grid.Row="1" Background="{DynamicResource AppTerminalBrush}">
+                <Grid x:Name="EmptyState" Grid.Row="2" Margin="1,0,1,8" Background="{DynamicResource AppTerminalBrush}" SizeChanged="EmptyState_SizeChanged">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="420">
-                        <TextBlock HorizontalAlignment="Center" FontFamily="Segoe Fluent Icons" FontSize="30"
-                                   Foreground="{DynamicResource ConsoleMetaBrush}" Text="&#xE756;" />
-                        <TextBlock Margin="0,12,0,0" HorizontalAlignment="Center" Text="还没有串口数据"
+                        <TextBlock HorizontalAlignment="Center" Text="准备好连接你的设备"
                                    Foreground="{DynamicResource AppTerminalTextBrush}" FontSize="13" FontWeight="SemiBold" />
-                        <TextBlock Margin="0,6,0,0" HorizontalAlignment="Center" TextWrapping="Wrap"
+                        <TextBlock x:Name="EmptyDescription" Margin="0,6,0,0" HorizontalAlignment="Center" TextWrapping="Wrap"
                                    Text="选择串口参数后打开端口开始收发。没有硬件时可以使用内置 DEMO 回环体验完整功能。"
                                    Foreground="{DynamicResource ConsoleMetaBrush}" FontSize="12" TextAlignment="Center" />
-                        <StackPanel Margin="0,16,0,0" Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Button Content="打开串口" Style="{StaticResource PrimaryButtonStyle}" Width="104"
-                                    Click="ConnectButton_Click" />
+                        <StackPanel Margin="0,10,0,0" Orientation="Horizontal" HorizontalAlignment="Center">
                             <Button Content="使用 DEMO 回环" Style="{StaticResource ConsoleSecondaryButtonStyle}"
-                                    Margin="10,0,0,0" Click="UseDemo_Click" />
+                                    Click="UseDemo_Click" />
                         </StackPanel>
                     </StackPanel>
                 </Grid>
@@ -235,7 +205,7 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Grid Grid.Row="0" Margin="14,10,14,0">
+                <WrapPanel Grid.Row="0" Margin="14,10,14,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="发送" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
                         <Border Style="{StaticResource SegmentContainerStyle}" Margin="12,0,0,0">
@@ -249,18 +219,16 @@
                         </Border>
                         <TextBlock Text="行尾" Style="{StaticResource CaptionTextStyle}" Margin="16,0,6,0"
                                    VerticalAlignment="Center" />
-                        <ComboBox x:Name="EndingBox" Style="{StaticResource InputComboBoxStyle}" Width="94"
-                                  />
+                        <ComboBox x:Name="EndingBox" Style="{StaticResource InputComboBoxStyle}" Width="80" SelectionChanged="SendOption_Changed" AutomationProperties.Name="发送行尾" />
                         <TextBlock Text="校验" Style="{StaticResource CaptionTextStyle}" Margin="12,0,6,0"
                                    VerticalAlignment="Center" />
-                        <ComboBox x:Name="ChecksumBox" Style="{StaticResource InputComboBoxStyle}" Width="138"
-                                  />
-                        <CheckBox x:Name="EscapeCheck" Content="转义" Margin="14,0,0,0" VerticalAlignment="Center"
+                        <ComboBox x:Name="ChecksumBox" Style="{StaticResource InputComboBoxStyle}" Width="134" SelectionChanged="SendOption_Changed" AutomationProperties.Name="发送校验" />
+                        <CheckBox MinWidth="0" x:Name="EscapeCheck" Content="转义" Margin="14,0,0,0" VerticalAlignment="Center"
                                   IsChecked="True" Click="EscapeCheck_Click" />
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <CheckBox x:Name="AutoSendCheck" Content="定时发送" VerticalAlignment="Center"
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,4,0,4">
+                        <CheckBox MinWidth="0" x:Name="AutoSendCheck" Content="定时" VerticalAlignment="Center"
                                   Checked="AutoSend_Changed" Unchecked="AutoSend_Changed" />
                         <TextBox x:Name="AutoSendIntervalBox" Style="{StaticResource InputTextBoxStyle}" Width="58"
                                  Height="28" MinHeight="28" Padding="6,2" Margin="8,0,0,0" Text="1000" />
@@ -269,21 +237,22 @@
                         <Button x:Name="HistoryButton" Style="{StaticResource IconButtonStyle}" Content="&#xE81C;"
                                 Margin="10,0,0,0" ToolTip="发送历史" Click="History_Click" />
                     </StackPanel>
-                </Grid>
+                </WrapPanel>
 
-                <Grid Grid.Row="1" Margin="14,10,14,0">
+                <Grid Grid.Row="1" Margin="14,8,14,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="132" />
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
-                        <TextBox x:Name="SendBox" Style="{StaticResource InputTextBoxStyle}" Height="76" MinHeight="76"
+                        <TextBox x:Name="SendBox" Style="{StaticResource InputTextBoxStyle}" Height="64" MinHeight="64" AutomationProperties.Name="发送内容"
                                  AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top"
                                  VerticalScrollBarVisibility="Auto" Padding="10,7"
                                  FontFamily="Cascadia Mono, Consolas, Microsoft YaHei UI" FontSize="12.5"
                                  TextChanged="SendBox_TextChanged"
                                  PreviewKeyDown="SendBox_PreviewKeyDown" />
+                        <TextBlock x:Name="SendPreviewText" Margin="2,5,0,0" Style="{StaticResource MonoTextStyle}" TextTrimming="CharacterEllipsis" ToolTip="实际发送字节，包含校验与行尾" />
                         <TextBlock x:Name="SendHintText" Margin="2,5,0,0" Style="{StaticResource CaptionTextStyle}"
                                    Text="Ctrl+Enter 发送，支持 \r \n \t \xNN 转义" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
@@ -309,7 +278,9 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="快捷指令" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" />
-                    <WrapPanel x:Name="QuickCommandPanel" Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" />
+                    <ScrollViewer Grid.Column="1" Margin="12,0,8,0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" MaxHeight="48">
+                        <WrapPanel x:Name="QuickCommandPanel" VerticalAlignment="Center" />
+                    </ScrollViewer>
                     <Button Grid.Column="2" Content="管理" Style="{StaticResource LinkButtonStyle}"
                             VerticalAlignment="Center" Click="ManageCommands_Click" />
                 </Grid>
@@ -317,14 +288,15 @@
         </Border>
 
         <!-- Status bar -->
-        <Grid Grid.Row="4" Margin="2,10,2,0">
+        <Grid Grid.Row="4" Margin="2,8,2,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Ellipse x:Name="StatusDot" Width="6" Height="6" Fill="{DynamicResource AppTextTertiaryBrush}"
                          VerticalAlignment="Center" />
                 <TextBlock x:Name="StatusText" Text="未连接串口" Margin="8,0,0,0"
                            Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" />
             </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <TextBlock x:Name="RecordingText" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center"
                            Margin="0,0,16,0" Visibility="Collapsed" />
                 <TextBlock x:Name="CounterText" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center"

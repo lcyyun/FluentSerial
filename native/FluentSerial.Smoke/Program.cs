@@ -5,6 +5,7 @@ using System.IO.Ports;
 using System.Text;
 using System.Text.RegularExpressions;
 using FluentSerial.Core;
+using FluentSerial.Features;
 
 // FluentSerial native smoke test: exercises the serial core end-to-end without hardware.
 // Run with: dotnet run --project native\FluentSerial.Smoke\FluentSerial.Smoke.csproj -c Release
@@ -48,15 +49,7 @@ static async Task<bool> WaitUntilAsync(Func<bool> condition, int timeoutMs = 300
 
 // ---------------------------------------------------------------- environment
 
-var smokeData = Path.Combine(Path.GetTempPath(), "fluentserial-native-smoke");
-try
-{
-    if (Directory.Exists(smokeData)) Directory.Delete(smokeData, recursive: true);
-}
-catch
-{
-    // a previous process may still hold a log handle; reuse the directory
-}
+var smokeData = Path.Combine(Path.GetTempPath(), "fluentserial-native-smoke", Guid.NewGuid().ToString("N"));
 Environment.SetEnvironmentVariable("FLUENTSERIAL_DATA_DIR", smokeData);
 AppServices.Initialize();
 Console.WriteLine($"data={AppServices.Paths.Root}");
@@ -74,6 +67,11 @@ try
         hexError ?? string.Empty);
     Check("hex odd digits", !SerialCodec.TryParseHex("ABC", out _, out var oddError) && !string.IsNullOrWhiteSpace(oddError),
         oddError ?? string.Empty);
+    foreach (var malformed in new[] { "AxB", "xAB", "0x", "01 0x", "A B", "0x1 0x2", "AA0xBB" })
+        Check($"hex rejects {malformed}", !SerialCodec.TryParseHex(malformed, out var rejected, out var error)
+                                            && rejected.Length == 0 && !string.IsNullOrWhiteSpace(error));
+    Check("hex supported separators", SerialCodec.ParseHex("0X01;02:03|04-05、06\n07")
+        .SequenceEqual(new byte[] { 1, 2, 3, 4, 5, 6, 7 }));
 
     var threw = false;
     try
@@ -92,6 +90,14 @@ try
     Check("escape hex", hexEscaped.SequenceEqual(new byte[] { 0x41, 0x42 }), SerialCodec.FormatHex(hexEscaped));
     var unicodeEscaped = SerialCodec.EncodeText("\\u4F60", "utf-8", useEscapes: true);
     Check("escape unicode", unicodeEscaped.SequenceEqual(new byte[] { 0xE4, 0xBD, 0xA0 }), SerialCodec.FormatHex(unicodeEscaped));
+    Check("escape preserves emoji", SerialCodec.EncodeText("A😀中\\r\\n", "utf-8", true)
+        .SequenceEqual(Encoding.UTF8.GetBytes("A😀中\r\n")));
+    Check("escape unicode surrogate pair", SerialCodec.EncodeText("\\uD83D\\uDE00", "utf-8", true)
+        .SequenceEqual(Encoding.UTF8.GetBytes("😀")));
+    Check("escape raw bytes stay raw", SerialCodec.EncodeText("😀\\xFF中", "utf-8", true)
+        .SequenceEqual(Encoding.UTF8.GetBytes("😀").Concat(new byte[] { 0xFF }).Concat(Encoding.UTF8.GetBytes("中"))));
+    Check("escape malformed preserved", SerialCodec.DecodeText(SerialCodec.EncodeText("\\xZ1\\uQQQQ\\z\\", "utf-8", true), "utf-8")
+        == "\\xZ1\\uQQQQ\\z\\");
     var literal = SerialCodec.EncodeText("A\\rB", "utf-8", useEscapes: false);
     Check("escape disabled", literal.SequenceEqual(new byte[] { 0x41, 0x5C, 0x72, 0x42 }), SerialCodec.FormatHex(literal));
     Check("unescape", SerialCodec.UnescapeText("A\\r\\nB") == "A\r\nB");
@@ -185,6 +191,13 @@ try
         recorderText.Split('\n').FirstOrDefault(line => line.Contains(" TX "))?.Trim() ?? string.Empty);
     Check("recorder note", recorderText.Contains("冒烟记录备注"));
 
+    var collisionRejected = false;
+    try { using var duplicate = new SessionRecorder(recorderPath, recorderOptions); }
+    catch (IOException) { collisionRejected = true; }
+    Check("recorder never overwrites existing log", collisionRejected && File.ReadAllText(recorderPath) == recorderText);
+    var uniquePaths = Enumerable.Range(0, 100).Select(_ => AppServices.Paths.NewSessionLogPath("DEMO", "same port")).ToList();
+    Check("recorder rapid reconnect unique paths", uniquePaths.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 100);
+
     var doubleDisposePath = Path.Combine(smokeData, "recorder-dispose.log");
     var doubleDisposeRecorder = new SessionRecorder(doubleDisposePath, recorderOptions);
     doubleDisposeRecorder.Dispose();
@@ -227,6 +240,43 @@ catch (Exception ex)
 }
 
 // ---------------------------------------------------------------- demo transport (direct)
+
+try
+{
+    const string valid = """[{"Id":"imported-id","Name":" Test ","Group":" Custom ","Payload":"01 02","Mode":"Hex","Ending":"None","Checksum":"None","UseCount":99}]""";
+    var import = QuickCommandImport.Parse(valid, Array.Empty<QuickCommand>(), "utf-8", true);
+    Check("import validates and normalizes", import.Commands.Count == 1 && import.Commands[0].Name == "Test"
+        && import.Commands[0].Group == "Custom" && import.Commands[0].Id != "imported-id" && import.Commands[0].UseCount == 0);
+    var repeated = QuickCommandImport.Parse(valid, import.Commands, "utf-8", true);
+    Check("import deduplicates existing commands", repeated.Commands.Count == 0 && repeated.DuplicateCount == 1);
+    var inFile = QuickCommandImport.Parse("[" + valid[1..^1] + "," + valid[1..^1] + "]", Array.Empty<QuickCommand>(), "utf-8", true);
+    Check("import deduplicates within file", inFile.Commands.Count == 1 && inFile.DuplicateCount == 1);
+    foreach (var invalid in new[] { "null", "[null]", "[{\"Name\":\"\",\"Payload\":\"AT\"}]",
+                 "[{\"Name\":\"bad\",\"Mode\":99,\"Payload\":\"AT\"}]",
+                 "[{\"Name\":\"bad hex\",\"Mode\":\"Hex\",\"Payload\":\"AxB\"}]",
+                 "[{\"Name\":\"empty\",\"Payload\":\"\",\"Ending\":\"None\"}]" })
+    {
+        var rejected = false;
+        try { QuickCommandImport.Parse(invalid, import.Commands, "utf-8", true); }
+        catch (FormatException) { rejected = true; }
+        Check("import rejects invalid entry", rejected, invalid);
+    }
+    var mixed = "[" + valid[1..^1] + ",null]";
+    var existingCount = AppServices.Data.Commands.Count;
+    var batchRejected = false;
+    try { QuickCommandImport.Parse(mixed, AppServices.Data.Commands, "utf-8", true); }
+    catch (FormatException) { batchRejected = true; }
+    Check("import validates whole batch before mutation", batchRejected && AppServices.Data.Commands.Count == existingCount);
+    var tooMany = "[" + string.Join(',', Enumerable.Repeat(valid[1..^1], QuickCommandImport.MaxCommands + 1)) + "]";
+    var limitRejected = false;
+    try { QuickCommandImport.Parse(tooMany, Array.Empty<QuickCommand>(), "utf-8", true); }
+    catch (FormatException) { limitRejected = true; }
+    Check("import enforces command limit", limitRejected);
+}
+catch (Exception ex)
+{
+    Check("command import section", false, ex.ToString());
+}
 
 try
 {
@@ -372,6 +422,14 @@ try
     service.Traffic -= boom;
     Check("service still open after handler exception", service.IsOpen);
 
+    var totalTxBeforeReset = service.BytesTx;
+    var totalRxBeforeReset = service.BytesRx;
+    service.ResetCounters();
+    Check("service display counters reset independently", service.BytesTx == 0 && service.TxFrames == 0);
+    var afterResetPayload = Encoding.ASCII.GetBytes("AT\r\n");
+    service.Send(afterResetPayload);
+    Check("service counter after reset", service.BytesTx == afterResetPayload.Length);
+
     var logPath = service.RecordingFilePath;
     service.Close("冒烟测试结束");
     Check("service close", !service.IsOpen && service.State == SerialLinkState.Closed, $"state={service.State}");
@@ -394,6 +452,8 @@ try
         && session.ProfileName == "Smoke DEMO" && session.EndedAt is not null && session.BytesRx > 0
         && session.BytesTx > 0 && session.Note.Contains("冒烟测试结束"),
         session is null ? "no session" : $"{session.PortName}/{session.Note}/rx={session.BytesRx}/tx={session.BytesTx}");
+    Check("service reset preserves session totals", session is not null
+        && session.BytesTx == totalTxBeforeReset + afterResetPayload.Length && session.BytesRx >= totalRxBeforeReset);
 
     Check("audit connection", AppServices.Data.Audit.Any(a => a.Category == "connection" && a.Message.Contains("已连接")));
     Check("audit disconnect", AppServices.Data.Audit.Any(a => a.Category == "connection" && a.Message.Contains("已断开")));
@@ -427,6 +487,13 @@ try
     service.Close("冒烟结束");
     Check("service final closed", service.State == SerialLinkState.Closed);
 
+    using var disposedService = new SerialSessionService();
+    disposedService.Dispose();
+    var disposedRejected = false;
+    try { disposedService.Open(new SerialConnectionOptions { PortName = "DEMO" }); }
+    catch (ObjectDisposedException) { disposedRejected = true; }
+    Check("service cannot reopen after disposal", disposedRejected && !disposedService.IsOpen);
+
     service.Traffic -= OnTraffic;
     service.ErrorOccurred -= OnError;
     service.StateChanged -= OnStateChanged;
@@ -438,6 +505,8 @@ catch (Exception ex)
 }
 
 // ---------------------------------------------------------------- summary
+
+await FluentSerial.Smoke.FileTransferSmoke.RunAsync(Check, smokeData);
 
 try
 {

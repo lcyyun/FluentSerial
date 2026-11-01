@@ -39,7 +39,7 @@ public sealed class SessionRecorder : IDisposable
         var directory = Path.GetDirectoryName(FilePath);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
-        var stream = new FileStream(FilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite,
+        var stream = new FileStream(FilePath, FileMode.CreateNew, FileAccess.Write, FileShare.Read,
             4096, FileOptions.SequentialScan);
         _writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
         {

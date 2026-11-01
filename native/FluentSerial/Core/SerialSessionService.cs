@@ -27,6 +27,9 @@ public sealed class SerialSessionService : IDisposable
 
     private long _bytesRx;
     private long _bytesTx;
+    // Display counters may be reset without erasing the complete session statistics.
+    private long _sessionBytesRx;
+    private long _sessionBytesTx;
     private int _rxFrames;
     private int _txFrames;
     private DateTime? _connectedAt;
@@ -184,6 +187,7 @@ public sealed class SerialSessionService : IDisposable
     public bool Open(SerialConnectionOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+        lock (_sync) ObjectDisposedException.ThrowIf(_disposed, this);
 
         // Switching port/parameters while connected: close the old session first (idempotent).
         Close("重新打开串口");
@@ -230,6 +234,8 @@ public sealed class SerialSessionService : IDisposable
             _lastError = string.Empty;
             _bytesRx = 0;
             _bytesTx = 0;
+            _sessionBytesRx = 0;
+            _sessionBytesTx = 0;
             _rxFrames = 0;
             _txFrames = 0;
             _connectedAt = null;
@@ -405,7 +411,8 @@ public sealed class SerialSessionService : IDisposable
             var message = string.IsNullOrWhiteSpace(ex.Message) ? "发送数据失败。" : ex.Message;
             lock (_sync)
             {
-                if (ReferenceEquals(_transport, transport)) _lastError = message;
+                if (!ReferenceEquals(_transport, transport)) return false;
+                _lastError = message;
             }
             RaiseError(message);
             return false;
@@ -413,7 +420,10 @@ public sealed class SerialSessionService : IDisposable
 
         lock (_sync)
         {
+            // A write finishing after a close/reconnect belongs to the old transport.
+            if (!ReferenceEquals(_transport, transport)) return false;
             _bytesTx += payload.Length;
+            _sessionBytesTx += payload.Length;
             _txFrames += 1;
         }
 
@@ -604,8 +614,8 @@ public sealed class SerialSessionService : IDisposable
             Record = _activeRecord,
             RecordingPath = _recordingPath,
             WasConnected = _connectedAt is not null,
-            BytesRx = _bytesRx,
-            BytesTx = _bytesTx
+            BytesRx = _sessionBytesRx,
+            BytesTx = _sessionBytesTx
         };
 
         _transport = null;
@@ -689,6 +699,7 @@ public sealed class SerialSessionService : IDisposable
         {
             if (!ReferenceEquals(_transport, source)) return;
             _bytesRx += data.Length;
+            _sessionBytesRx += data.Length;
             _rxFrames += 1;
             recorder = _recorder;
         }

@@ -113,7 +113,14 @@
             </Border>
         </Grid>
 
-        <ListBox x:Name="SectionTabs" Grid.Row="2" Margin="0,18,0,12" Background="Transparent"
+        <Grid Grid.Row="2" Margin="0,18,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="300" />
+            </Grid.ColumnDefinitions>
+        <ListBox x:Name="SectionTabs" Grid.Column="0" Background="Transparent"
                  BorderThickness="0" ItemContainerStyle="{StaticResource LogSegmentStyle}"
                  SelectionChanged="SectionTabs_SelectionChanged" SelectedIndex="0">
             <ListBox.ItemsPanel>
@@ -124,6 +131,17 @@
             <ListBoxItem Content="会话记录" />
             <ListBoxItem Content="审计事件" />
         </ListBox>
+            <Button x:Name="ResetSearchButton" Grid.Column="2" Content="清除搜索" Margin="8,0,10,0"
+                    Style="{StaticResource LinkButtonStyle}" Click="ResetSearch_Click" Visibility="Collapsed" />
+            <Grid Grid.Column="3">
+                <TextBox x:Name="SearchBox" Style="{StaticResource InputTextBoxStyle}" Padding="30,6,10,6"
+                         TextChanged="SearchBox_TextChanged" AutomationProperties.Name="搜索会话或审计事件" />
+                <TextBlock x:Name="SearchHint" Text="搜索端口、日期、文件或事件" Margin="30,0,0,0"
+                           VerticalAlignment="Center" IsHitTestVisible="False" Style="{StaticResource CaptionTextStyle}" />
+                <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="13" Margin="10,0,0,0"
+                           VerticalAlignment="Center" IsHitTestVisible="False" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+            </Grid>
+        </Grid>
 
         <Grid Grid.Row="3">
             <Border x:Name="SessionsView" Background="{DynamicResource AppSurfaceBrush}"
@@ -180,7 +198,7 @@
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="120" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding TimeLabel}" VerticalAlignment="Center"
+                                                <TextBlock Text="{Binding TimeLabel}" VerticalAlignment="Center" ToolTip="{Binding StartedAt}"
                                                            Style="{StaticResource MonoTextStyle}"
                                                            Foreground="{DynamicResource AppTextTertiaryBrush}" />
                                                 <TextBlock Grid.Column="1" Text="{Binding DisplayPort}" Margin="0,0,10,0"

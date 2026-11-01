@@ -1,12 +1,15 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using FluentSerial.Core;
 
 namespace FluentSerial.Features;
 
 public partial class SettingsPage : UserControl, IActivatablePage
 {
+    private bool _loading;
+    private bool _hasDraft;
     private sealed record Choice<T>(T Value, string Label)
     {
         public override string ToString() => Label;
@@ -17,12 +20,42 @@ public partial class SettingsPage : UserControl, IActivatablePage
         InitializeComponent();
         ConfigureChoices();
         LoadFromSettings(AppServices.Settings);
+        AddHandler(TextBoxBase.TextChangedEvent, new TextChangedEventHandler(FormChanged));
+        AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(FormChanged));
+        AddHandler(ToggleButton.CheckedEvent, new RoutedEventHandler(FormChanged));
+        AddHandler(ToggleButton.UncheckedEvent, new RoutedEventHandler(FormChanged));
     }
 
     public void OnActivated()
     {
+        if (_hasDraft)
+        {
+            ShowDraftStatus();
+            return;
+        }
         LoadFromSettings(AppServices.Settings);
         StatusText.Text = "本地设置";
+        StatusText.SetResourceReference(TextBlock.ForegroundProperty, "AppTextTertiaryBrush");
+    }
+
+    private void FormChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading || !IsLoaded) return;
+        _hasDraft = true;
+        ShowDraftStatus();
+    }
+
+    private void ShowDraftStatus()
+    {
+        StatusText.Text = "有未保存的修改";
+        StatusText.SetResourceReference(TextBlock.ForegroundProperty, "AppWarningBrush");
+        DiscardButton.IsEnabled = true;
+    }
+
+    private void Discard_Click(object sender, RoutedEventArgs e)
+    {
+        _hasDraft = false;
+        OnActivated();
     }
 
     private void ConfigureChoices()
@@ -64,6 +97,7 @@ public partial class SettingsPage : UserControl, IActivatablePage
 
     private void LoadFromSettings(AppSettings settings)
     {
+        _loading = true;
         SelectChoice(ThemeBox, NormalizeTheme(settings.Theme));
         SelectChoice(EncodingBox, settings.DefaultEncoding);
         SelectChoice(ReceiveModeBox, settings.ReceiveMode);
@@ -80,6 +114,9 @@ public partial class SettingsPage : UserControl, IActivatablePage
         UseEscapesCheck.IsChecked = settings.UseEscapes;
         AutoRecordCheck.IsChecked = settings.AutoRecord;
         DataPathText.Text = AppServices.Paths.Root;
+        DataPathText.ToolTip = AppServices.Paths.Root;
+        _loading = false;
+        DiscardButton.IsEnabled = _hasDraft;
     }
 
     private static string NormalizeTheme(string theme)
@@ -106,24 +143,24 @@ public partial class SettingsPage : UserControl, IActivatablePage
         if (!double.TryParse(fontSizeText, NumberStyles.Float, CultureInfo.InvariantCulture, out var fontSize) &&
             !double.TryParse(fontSizeText, out fontSize))
         {
-            Fail("控制台字号必须是数字，范围 9-24");
+            Fail("控制台字号必须是数字，范围 9-24", FontSizeBox);
             return;
         }
-        if (fontSize < 9 || fontSize > 24)
+        if (!double.IsFinite(fontSize) || fontSize < 9 || fontSize > 24)
         {
-            Fail("控制台字号需在 9-24 之间");
+            Fail("控制台字号需在 9-24 之间", FontSizeBox);
             return;
         }
         if (!int.TryParse(MaxLinesBox.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxLines) ||
             maxLines < 200 || maxLines > 20000)
         {
-            Fail("控制台最大行数需在 200-20000 之间");
+            Fail("控制台最大行数需在 200-20000 之间", MaxLinesBox);
             return;
         }
         if (!int.TryParse(AutoSendIntervalBox.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var interval) ||
             interval < 50 || interval > 60000)
         {
-            Fail("定时发送间隔需在 50-60000 ms 之间");
+            Fail("定时发送间隔需在 50-60000 ms 之间", AutoSendIntervalBox);
             return;
         }
 
@@ -149,21 +186,27 @@ public partial class SettingsPage : UserControl, IActivatablePage
         AppServices.MainWindow?.RefreshThemeUi();
         AppServices.MainWindow?.Terminal?.ApplySettings();
         AppServices.Audit.Add(AuditLevel.Info, "settings", "更新应用设置");
+        _hasDraft = false;
+        DiscardButton.IsEnabled = false;
         StatusText.Text = $"已保存  {DateTime.Now:HH:mm:ss}";
-        StatusText.Foreground = (System.Windows.Media.Brush)FindResource("AppSuccessBrush");
+        StatusText.SetResourceReference(TextBlock.ForegroundProperty, "AppSuccessBrush");
     }
 
-    private void Fail(string message)
+    private void Fail(string message, TextBox input)
     {
         StatusText.Text = message;
-        StatusText.Foreground = (System.Windows.Media.Brush)FindResource("AppDangerBrush");
+        StatusText.SetResourceReference(TextBlock.ForegroundProperty, "AppDangerBrush");
+        input.Focus();
+        input.SelectAll();
+        input.BringIntoView();
     }
 
     private void RestoreDefaults_Click(object sender, RoutedEventArgs e)
     {
+        _hasDraft = true;
         LoadFromSettings(new AppSettings());
         StatusText.Text = "已填入默认值，保存后生效";
-        StatusText.Foreground = (System.Windows.Media.Brush)FindResource("AppTextTertiaryBrush");
+        StatusText.SetResourceReference(TextBlock.ForegroundProperty, "AppWarningBrush");
     }
 
     private void OpenData_Click(object sender, RoutedEventArgs e) => AppServices.OpenInExplorer(AppServices.Paths.Root);
@@ -175,5 +218,7 @@ public partial class SettingsPage : UserControl, IActivatablePage
     public string SaveStatusForSmoke => StatusText.Text;
 
     /// <summary>Invokes the same save handler as the visible button for --ui-smoke.</summary>
-    public void SaveForSmoke() => Save_Click(this, new RoutedEventArgs());
+    public void SaveForSmoke() => SaveSettings();
+
+    public void SaveSettings() => Save_Click(this, new RoutedEventArgs());
 }

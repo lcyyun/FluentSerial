@@ -40,7 +40,7 @@
             </Grid.ColumnDefinitions>
             <Grid Grid.Column="0">
                 <TextBox x:Name="SearchBox" Style="{StaticResource InputTextBoxStyle}" Padding="30,6,10,6"
-                         TextChanged="SearchBox_TextChanged" />
+                         TextChanged="SearchBox_TextChanged" AutomationProperties.Name="搜索端口预设" />
                 <TextBlock x:Name="SearchHint" Text="搜索名称、端口或备注" Margin="30,0,0,0" VerticalAlignment="Center"
                            IsHitTestVisible="False" Style="{StaticResource CaptionTextStyle}" />
                 <TextBlock FontFamily="Segoe Fluent Icons" FontSize="13" Text="&#xE721;" Margin="10,0,0,0"
@@ -52,6 +52,9 @@
                 <ComboBoxItem Content="全部预设" Tag="all" />
                 <ComboBoxItem Content="仅收藏" Tag="favorites" />
             </ComboBox>
+            <Button x:Name="ResetFilterButton" Grid.Column="2" Content="重置筛选"
+                    HorizontalAlignment="Left" Margin="10,0,0,0" Visibility="Collapsed"
+                    Style="{StaticResource LinkButtonStyle}" Click="ResetFilter_Click" />
         </Grid>
 
         <Grid Grid.Row="2">
@@ -84,9 +87,22 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="{Binding Name}" Style="{StaticResource BodyTextStyle}"
                                                    FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Column="1" Text="★" FontSize="12" Margin="6,0,0,0"
-                                                   Foreground="{DynamicResource AppAccentBrush}"
-                                                   Visibility="{Binding Favorite, Converter={StaticResource BoolToVis}}" />
+                                        <Button Grid.Column="1" Tag="{Binding}" Click="FavoritePreset_Click"
+                                                Margin="6,-5,-3,-5" AutomationProperties.Name="收藏或取消收藏预设">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource ListRowButtonStyle}">
+                                                    <Setter Property="Content" Value="&#xE734;" />
+                                                    <Setter Property="ToolTip" Value="收藏预设" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Favorite}" Value="True">
+                                                            <Setter Property="Content" Value="&#xE735;" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+                                                            <Setter Property="ToolTip" Value="取消收藏" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
                                     </Grid>
 
                                     <TextBlock Grid.Row="1" Margin="0,3,0,0" Text="{Binding PortLabel}"

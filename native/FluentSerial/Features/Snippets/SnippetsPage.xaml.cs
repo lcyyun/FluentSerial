@@ -60,7 +60,7 @@ public partial class SnippetsPage : UserControl, IActivatablePage
                      .Distinct(StringComparer.CurrentCulture)
                      .OrderBy(g => g, StringComparer.CurrentCulture))
         {
-            GroupFilter.Items.Add(new ComboBoxItem { Content = group, Tag = group });
+            GroupFilter.Items.Add(new ComboBoxItem { Content = group, Tag = "group:" + group });
         }
 
         var match = GroupFilter.Items.OfType<ComboBoxItem>()
@@ -75,7 +75,8 @@ public partial class SnippetsPage : UserControl, IActivatablePage
         IEnumerable<QuickCommand> query = AppServices.Data.Commands;
         var scope = (GroupFilter.SelectedItem as ComboBoxItem)?.Tag as string;
         if (scope == "favorites") query = query.Where(c => c.Favorite);
-        else if (!string.IsNullOrEmpty(scope) && scope != "all") query = query.Where(c => c.Group == scope);
+        else if (scope?.StartsWith("group:", StringComparison.Ordinal) == true)
+            query = query.Where(c => c.Group == scope[6..]);
 
         var search = SearchBox.Text.Trim();
         if (search.Length > 0)
@@ -114,11 +115,26 @@ public partial class SnippetsPage : UserControl, IActivatablePage
         }
 
         SearchHint.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ResetFilterButton.Visibility = filtering ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => RefreshList();
 
     private void GroupFilter_SelectionChanged(object sender, SelectionChangedEventArgs e) => RefreshList();
+
+    private void ResetFilter_Click(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Clear();
+        GroupFilter.SelectedIndex = 0;
+        SearchBox.Focus();
+    }
+
+    private void FavoriteCommand_Click(object sender, RoutedEventArgs e)
+    {
+        if (CommandFrom(sender) is not { } command) return;
+        command.Favorite = !command.Favorite;
+        AppServices.NotifyDataChanged();
+    }
 
     private void NewCommand_Click(object sender, RoutedEventArgs e) => ShowCommandDialog(null);
 
@@ -174,11 +190,20 @@ public partial class SnippetsPage : UserControl, IActivatablePage
         };
         if (picker.ShowDialog() != true) return;
 
-        List<QuickCommand> imported;
+        QuickCommandImport.Result result;
         try
         {
+            if (new FileInfo(picker.FileName).Length > QuickCommandImport.MaxFileBytes)
+                throw new FormatException("指令文件不能超过 4 MB，请拆分文件后重试。");
             var json = File.ReadAllText(picker.FileName, Encoding.UTF8);
-            imported = JsonSerializer.Deserialize<List<QuickCommand>>(json, JsonOptions) ?? new List<QuickCommand>();
+            result = QuickCommandImport.Parse(json, AppServices.Data.Commands,
+                AppServices.Settings.DefaultEncoding, AppServices.Settings.UseEscapes);
+        }
+        catch (FormatException ex)
+        {
+            MessageBox.Show($"{ex.Message}\n未导入任何指令，请修正文件后重试。", "导入快捷指令",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
         }
         catch (JsonException ex)
         {
@@ -195,32 +220,26 @@ public partial class SnippetsPage : UserControl, IActivatablePage
             return;
         }
 
-        // Filtering with OfType also drops JSON "null" entries so a bad element cannot
-        // leave a half-finished import behind.
-        var parsed = imported.OfType<QuickCommand>().ToList();
+        var parsed = result.Commands;
         if (parsed.Count == 0)
         {
-            MessageBox.Show("该文件中没有可导入的指令。", "导入快捷指令",
-                MessageBoxButton.OK, MessageBoxImage.Information);
+            var message = result.DuplicateCount > 0
+                ? $"所有指令均已存在，已跳过 {result.DuplicateCount} 条重复指令。"
+                : "该文件中没有可导入的指令。";
+            MessageBox.Show(message, "导入快捷指令", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        foreach (var command in parsed)
-        {
-            command.Id = Guid.NewGuid().ToString("N");
-            if (string.IsNullOrWhiteSpace(command.Name)) command.Name = "未命名指令";
-            if (string.IsNullOrWhiteSpace(command.Group)) command.Group = "自定义";
-            if (command.Payload is null) command.Payload = string.Empty;
-            if (command.Description is null) command.Description = string.Empty;
-            AppServices.Data.Commands.Add(command);
-        }
+        foreach (var command in parsed) AppServices.Data.Commands.Add(command);
 
         AppServices.Audit.Add(AuditLevel.Info, "system", $"导入 {parsed.Count} 条快捷指令",
             Path.GetFileName(picker.FileName));
         AppServices.NotifyDataChanged();
+        SearchBox.Clear();
         RebuildGroupFilter();
+        GroupFilter.SelectedIndex = 0;
         RefreshList();
-        MessageBox.Show($"已导入 {parsed.Count} 条快捷指令。", "导入完成",
+        MessageBox.Show($"已导入 {parsed.Count} 条快捷指令，跳过 {result.DuplicateCount} 条重复指令。", "导入完成",
             MessageBoxButton.OK, MessageBoxImage.Information);
     }
 

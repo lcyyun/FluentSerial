@@ -59,15 +59,24 @@ public partial class LogsPage : UserControl, IActivatablePage
 
     private void RefreshSessions()
     {
-        SessionList.ItemsSource = AppServices.Data.Sessions;
-        EmptySessionsText.Visibility =
-            AppServices.Data.Sessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        var search = SearchBox?.Text.Trim() ?? string.Empty;
+        var sessions = AppServices.Data.Sessions.Where(session => search.Length == 0 ||
+            Matches(search, session.DisplayPort, session.ParamsLabel, session.FileName,
+                session.Note, session.StartedAt.ToString("yyyy-MM-dd HH:mm:ss"))).ToList();
+        SessionList.ItemsSource = sessions;
+        EmptySessionsText.Text = search.Length == 0 ? "还没有会话记录" : "没有匹配的会话，请更换关键词或清除搜索";
+        EmptySessionsText.Visibility = sessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void RefreshAudit()
     {
-        AuditList.ItemsSource = AppServices.Data.Audit;
-        EmptyAuditText.Visibility = AppServices.Data.Audit.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        var search = SearchBox?.Text.Trim() ?? string.Empty;
+        var events = AppServices.Data.Audit.Where(item => search.Length == 0 ||
+            Matches(search, item.Message, item.Detail, item.LevelLabel, item.CategoryLabel,
+                item.At.ToString("yyyy-MM-dd HH:mm:ss"))).ToList();
+        AuditList.ItemsSource = events;
+        EmptyAuditText.Text = search.Length == 0 ? "还没有审计事件" : "没有匹配的事件，请更换关键词或清除搜索";
+        EmptyAuditText.Visibility = events.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void RefreshStats()
@@ -91,9 +100,33 @@ public partial class LogsPage : UserControl, IActivatablePage
 
     private void UpdateCountText()
     {
-        CountText.Text = SectionTabs.SelectedIndex == 1
-            ? $"{AppServices.Data.Audit.Count} 条事件"
-            : $"{AppServices.Data.Sessions.Count} 条会话";
+        var audit = SectionTabs.SelectedIndex == 1;
+        var total = audit ? AppServices.Data.Audit.Count : AppServices.Data.Sessions.Count;
+        var visible = audit ? AuditList.Items.Count : SessionList.Items.Count;
+        var unit = audit ? "条事件" : "条会话";
+        var filtering = !string.IsNullOrWhiteSpace(SearchBox?.Text);
+        CountText.Text = filtering ? $"{visible} / {total} {unit}" : $"{total} {unit}";
+        if (ResetSearchButton is not null)
+            ResetSearchButton.Visibility = filtering ? Visibility.Visible : Visibility.Collapsed;
+        if (SearchHint is not null)
+            SearchHint.Visibility = string.IsNullOrEmpty(SearchBox?.Text) ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static bool Matches(string query, params string?[] values)
+        => values.Any(value => value?.Contains(query, StringComparison.OrdinalIgnoreCase) == true);
+
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (SessionList is null || AuditList is null) return;
+        RefreshSessions();
+        RefreshAudit();
+        UpdateCountText();
+    }
+
+    private void ResetSearch_Click(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Clear();
+        SearchBox.Focus();
     }
 
     private void OnDataChanged()
@@ -173,12 +206,23 @@ public partial class LogsPage : UserControl, IActivatablePage
             AppServices.ShowError("该会话没有可用的记录文件。");
             return;
         }
+        if (!File.Exists(session.FilePath))
+        {
+            AppServices.ShowError("记录文件已被移动或删除。");
+            return;
+        }
         AppServices.OpenInExplorer(session.FilePath);
     }
 
     private void DeleteSession_Click(object sender, RoutedEventArgs e)
     {
         if (SessionFrom(sender) is not { } session) return;
+        if (session.EndedAt is null && AppServices.Serial.IsOpen &&
+            session.StartedAt == AppServices.Serial.ConnectedAt)
+        {
+            AppServices.ShowError("此会话仍在进行，请先关闭串口后再删除记录。");
+            return;
+        }
         if (!ConfirmDialog.Show(AppServices.MainWindow, "删除会话记录",
                 $"删除会话记录「{session.DisplayPort}」及其记录文件？此操作不可撤销。", "删除", danger: true)) return;
 

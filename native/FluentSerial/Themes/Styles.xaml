@@ -242,7 +242,9 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBox">
                     <Grid>
-                        <ToggleButton x:Name="ToggleButton" Focusable="False" ClickMode="Press"
+                        <ToggleButton x:Name="ToggleButton" Focusable="False" ClickMode="Press" Style="{x:Null}"
+                                      MinHeight="32" VerticalAlignment="Stretch"
+                                      Foreground="{TemplateBinding Foreground}"
                                       HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                                       IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
                             <ToggleButton.Template>
@@ -289,6 +291,9 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
                             <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.55" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

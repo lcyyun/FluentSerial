@@ -280,6 +280,12 @@ public partial class App : Application
                 await Task.Delay(300);
                 Check("关闭串口", !AppServices.Serial.IsOpen, AppServices.Serial.State.ToString());
 
+                window.Navigate("terminal");
+                foreach (var check in terminal.CheckRenderingForSmoke()) Check(check.Name, check.Ok, check.Detail);
+                foreach (var check in terminal.CheckSendExperienceForSmoke()) Check(check.Name, check.Ok, check.Detail);
+                foreach (var check in terminal.CheckLayoutForSmoke(window)) Check(check.Name, check.Ok, check.Detail);
+                foreach (var check in Features.ExperienceSmokeChecks.Check(window)) Check(check.Name, check.Ok, check.Detail);
+
                 Check("会话记录落盘",
                     AppServices.Data.Sessions.Any(s => s.EndedAt is not null && File.Exists(s.FilePath)),
                     $"{AppServices.Data.Sessions.Count} sessions");

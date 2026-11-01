@@ -50,6 +50,16 @@
                     </Grid>
                     <Border Style="{StaticResource HairlineStyle}" />
                     <Grid Height="34">
+                        <TextBlock Text="查找控制台内容" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Text="Ctrl + F" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}" />
+                    </Grid>
+                    <Border Style="{StaticResource HairlineStyle}" />
+                    <Grid Height="34">
+                        <TextBlock Text="召回历史 / 恢复草稿" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Text="Ctrl + ↑ / ↓" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}" />
+                    </Grid>
+                    <Border Style="{StaticResource HairlineStyle}" />
+                    <Grid Height="34">
                         <TextBlock Text="切换页面" VerticalAlignment="Center" Style="{StaticResource BodyTextStyle}" />
                         <TextBlock Text="Ctrl + 1 … 4" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource MonoTextStyle}" />
                     </Grid>

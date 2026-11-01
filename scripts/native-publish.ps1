@@ -11,26 +11,25 @@ $project = Join-Path $root "native\FluentSerial\FluentSerial.csproj"
 $outputPath = Join-Path $root $Output
 
 Write-Host "Publishing FluentSerial Native to $outputPath"
-Get-Process FluentSerial -ErrorAction SilentlyContinue | Stop-Process -Force
 
 dotnet publish $project -c $Configuration -r $Runtime --self-contained true `
     -p:PublishSingleFile=true `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:EnableCompressionInSingleFile=true `
     -p:DebugType=None `
+    -p:DebugSymbols=false `
     -o $outputPath
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE" }
-
-Get-ChildItem $outputPath -Filter *.pdb -ErrorAction SilentlyContinue | Remove-Item -Force
 
 $exe = Join-Path $outputPath "FluentSerial.exe"
 if (-not (Test-Path $exe)) {
     throw "Publish completed but FluentSerial.exe was not produced."
 }
 
-$zip = Join-Path $root "dist\FluentSerial-native-win-x64.zip"
-if (Test-Path $zip) { Remove-Item $zip -Force }
-Compress-Archive -Path (Join-Path $outputPath "*") -DestinationPath $zip -CompressionLevel Optimal
+$zip = $outputPath.TrimEnd('\', '/') + ".zip"
+$pendingZip = $zip + "." + [Guid]::NewGuid().ToString("N") + ".zip"
+Compress-Archive -Path (Join-Path $outputPath "*") -DestinationPath $pendingZip -CompressionLevel Optimal
+Move-Item -LiteralPath $pendingZip -Destination $zip -Force
 
 Write-Host ""
 Write-Host "Native executable: $exe"

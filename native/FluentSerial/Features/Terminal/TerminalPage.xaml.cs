@@ -66,7 +66,12 @@ public partial class TerminalPage : UserControl, IActivatablePage
     private bool _autoSendTicking;
     private bool _suppressPortMemory;
     private SerialLinkState _lastState = SerialLinkState.Closed;
-    private int _sendHistoryIndex;
+    private int _sendHistoryIndex = -1;
+    private string _historyDraft = string.Empty;
+    private PortProfile? _selectedProfile;
+    private bool _skipNextRxLf;
+    private const int RenderBatchSize = 200;
+    private const int MaxRxLineLength = 4096;
 
     public TerminalPage()
     {
@@ -183,10 +188,11 @@ public partial class TerminalPage : UserControl, IActivatablePage
         {
             ApplySettingsFromStore();
             RefreshPorts();
+            _initialized = true;
             UpdateQuickCommands();
             UpdateUiState();
             UpdateCounters();
-            _initialized = true;
+            UpdateSendSize();
         }
         else
         {
@@ -208,6 +214,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
     public void ApplySettings()
     {
         ApplySettingsFromStore();
+        UpdateSendSize();
         _reRenderRequested = true;
     }
 
@@ -224,12 +231,13 @@ public partial class TerminalPage : UserControl, IActivatablePage
             var fontFamily = new FontFamily($"{family}, Consolas, Microsoft YaHei UI");
             _document.FontFamily = fontFamily;
             ConsoleBox.FontFamily = fontFamily;
-            _document.FontSize = Math.Clamp(settings.ConsoleFontSize, 9, 24);
+            _document.FontSize = double.IsFinite(settings.ConsoleFontSize) ? Math.Clamp(settings.ConsoleFontSize, 9, 24) : 12;
             ConsoleBox.FontSize = _document.FontSize;
             _document.LineHeight = Math.Round(_document.FontSize * 1.5, 1);
 
             TimestampCheck.IsChecked = settings.ShowTimestamp;
             ShowTxCheck.IsChecked = settings.ShowTx;
+            AutoScrollCheck.IsChecked = settings.AutoScroll;
             EscapeCheck.IsChecked = settings.UseEscapes;
             AutoSendIntervalBox.Text = Math.Clamp(settings.AutoSendIntervalMs, 50, 60000).ToString();
             SelectChoice(EncodingBox, _encodingName);
@@ -276,7 +284,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
 
     public void RefreshPorts()
     {
-        var previous = (PortBox.SelectedItem as SerialPortInfo)?.Name;
+        var previous = AppServices.Serial.IsOpen ? AppServices.Serial.Options?.PortName : (PortBox.SelectedItem as SerialPortInfo)?.Name;
         if (string.IsNullOrWhiteSpace(previous) && !_initialized)
             previous = Settings.LastPortName;
 
@@ -296,6 +304,8 @@ public partial class TerminalPage : UserControl, IActivatablePage
         {
             _ports.Clear();
             foreach (var port in ports) _ports.Add(port);
+            if (AppServices.Serial.IsOpen && !string.IsNullOrEmpty(previous) && !_ports.Any(p => p.Name.Equals(previous, StringComparison.OrdinalIgnoreCase)))
+                _ports.Add(new SerialPortInfo(previous, "当前连接，刷新时未检测到设备"));
             PortBox.SelectedItem = _ports.FirstOrDefault(p => string.Equals(p.Name, previous, StringComparison.OrdinalIgnoreCase))
                                    ?? _ports.FirstOrDefault();
         }
@@ -325,7 +335,10 @@ public partial class TerminalPage : UserControl, IActivatablePage
     {
         if (!_initialized || _loadingUi || _suppressPortMemory) return;
         if (PortBox.SelectedItem is SerialPortInfo info)
+        {
+            _selectedProfile = null;
             Settings.LastPortName = info.Name;
+        }
     }
 
     // ---------------------------------------------------------------- connection
@@ -333,11 +346,15 @@ public partial class TerminalPage : UserControl, IActivatablePage
     private SerialConnectionOptions BuildOptions()
     {
         var port = PortBox.SelectedItem as SerialPortInfo;
-        var baud = int.TryParse((BaudBox.Text ?? string.Empty).Trim(), out var parsed) ? parsed : 115200;
+        if (port is null) throw new ArgumentException("请选择一个串口设备，或使用 DEMO 回环。");
+        if (!int.TryParse(BaudBox.Text.Trim(), out var baud) || baud < 1 || baud > 4_000_000)
+            throw new ArgumentException("波特率必须是 1–4000000 之间的整数，请检查输入。");
         return new SerialConnectionOptions
         {
-            PortName = port?.Name ?? Settings.LastPortName,
-            BaudRate = Math.Clamp(baud, 1, 4_000_000),
+            PortName = port.Name,
+            BaudRate = baud,
+            ProfileId = _selectedProfile?.Id,
+            ProfileName = _selectedProfile?.Name ?? string.Empty,
             DataBits = DataBitsBox.SelectedItem is int bits ? bits : 8,
             Parity = ChoiceValue(ParityBox, Parity.None),
             StopBits = ChoiceValue(StopBitsBox, StopBits.One),
@@ -352,6 +369,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
 
     public void ToggleConnect()
     {
+        if (IsSendingFile) { CancelFileSend(); return; }
         if (AppServices.Serial.IsOpen || AppServices.Serial.State == SerialLinkState.Opening)
         {
             AppServices.Serial.Close("用户关闭");
@@ -362,10 +380,21 @@ public partial class TerminalPage : UserControl, IActivatablePage
 
     private void OpenCurrent()
     {
-        var options = BuildOptions();
         ConnectionErrorText.Visibility = Visibility.Collapsed;
         ConnectionErrorText.Text = string.Empty;
         var opened = false;
+        SerialConnectionOptions options;
+        try
+        {
+            options = BuildOptions();
+        }
+        catch (ArgumentException ex)
+        {
+            ConnectionErrorText.Text = ex.Message;
+            ConnectionErrorText.Visibility = Visibility.Visible;
+            BaudBox.Focus();
+            return;
+        }
         try
         {
             opened = AppServices.Serial.Open(options);
@@ -396,6 +425,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
     public void ConnectWithProfile(PortProfile profile)
     {
         if (profile is null) return;
+        if (IsSendingFile) { CancelFileSend(); return; }
         if (AppServices.Serial.IsOpen) AppServices.Serial.Close("切换端口预设");
 
         _loadingUi = true;
@@ -420,6 +450,8 @@ public partial class TerminalPage : UserControl, IActivatablePage
             _loadingUi = false;
         }
 
+        _selectedProfile = profile;
+        UpdateSendSize();
         OpenCurrent();
     }
 
@@ -444,6 +476,8 @@ public partial class TerminalPage : UserControl, IActivatablePage
 
     private void UseDemo_Click(object sender, RoutedEventArgs e)
     {
+        if (IsSendingFile) { CancelFileSend(); return; }
+        _selectedProfile = null;
         SelectPortByName("DEMO");
         if (AppServices.Serial.IsOpen) AppServices.Serial.Close("切换到 DEMO");
         OpenCurrent();
@@ -462,8 +496,8 @@ public partial class TerminalPage : UserControl, IActivatablePage
         {
             try
             {
-                AppServices.Serial.SetDtr(dtr);
-                AppServices.Serial.SetRts(rts);
+                if (ReferenceEquals(sender, DtrCheck)) AppServices.Serial.SetDtr(dtr);
+                if (ReferenceEquals(sender, RtsCheck) && RtsCheck.IsEnabled) AppServices.Serial.SetRts(rts);
             }
             catch (Exception ex)
             {
@@ -502,7 +536,12 @@ public partial class TerminalPage : UserControl, IActivatablePage
     {
         AddHistory(traffic);
         EmptyState.Visibility = Visibility.Collapsed;
+        if (_paused) return;
+        RenderTraffic(traffic);
+    }
 
+    private void RenderTraffic(SerialTraffic traffic)
+    {
         if (traffic.Direction == TrafficDirection.System)
         {
             FlushRxLine();
@@ -527,6 +566,8 @@ public partial class TerminalPage : UserControl, IActivatablePage
             }
             else
             {
+                if (_lastRxAt != DateTime.MinValue && (traffic.At - _lastRxAt).TotalMilliseconds > 80)
+                    FlushRxLine();
                 AppendRxText(traffic);
             }
         }
@@ -613,6 +654,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
         ParityBox.IsEnabled = !open && !busy;
         StopBitsBox.IsEnabled = !open && !busy;
         HandshakeBox.IsEnabled = !open && !busy;
+        UpdateSignalControls();
         RefreshPortsButton.IsEnabled = !busy;
         BreakButton.IsEnabled = open;
         ResetCountersButton.IsEnabled = open;
@@ -641,6 +683,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
 
         if (open) ConnectionErrorText.Visibility = Visibility.Collapsed;
         EmptyState.Visibility = _history.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateSendSize();
 
         if (!open && state != SerialLinkState.Error)
         {
@@ -657,68 +700,50 @@ public partial class TerminalPage : UserControl, IActivatablePage
         _historyBytes += traffic.Length;
         if (_history.Count > MaxHistoryEntries || _historyBytes > MaxHistoryBytes)
         {
-            while (_history.Count > MaxHistoryEntries || _historyBytes > MaxHistoryBytes)
+            var remove = 0;
+            while (_history.Count - remove > MaxHistoryEntries || _historyBytes > MaxHistoryBytes)
             {
-                _historyBytes -= _history[0].Length;
-                _history.RemoveAt(0);
+                _historyBytes -= _history[remove++].Length;
             }
-            _reRenderRequested = true;
+            _history.RemoveRange(0, remove);
         }
     }
 
     private void AppendRxText(SerialTraffic traffic)
     {
-        if (_rxLineAt is null) _rxLineAt = traffic.At;
         var text = DecodeChunk(traffic.Data);
-        if (text.Length == 0) text = string.Empty;
-        _rxLine.Append(text);
         _lastRxAt = traffic.At;
-
-        var buffered = _rxLine.ToString();
-        var start = 0;
-        var index = 0;
-        while (index < buffered.Length)
+        foreach (var ch in text)
         {
-            var ch = buffered[index];
-            if (ch == '\r')
+            if (_skipNextRxLf)
             {
-                // Keep a trailing CR in the buffer so a CRLF split across reads is not
-                // rendered as an extra empty line.
-                if (index == buffered.Length - 1) break;
-                var lineText = buffered.Substring(start, index - start);
-                if (buffered[index + 1] == '\n') index++;
+                _skipNextRxLf = false;
+                if (ch == '\n') continue;
+            }
+            _rxLineAt ??= traffic.At;
+            if (ch is '\r' or '\n')
+            {
                 EnqueueLine(new ConsoleLine
                 {
                     At = _rxLineAt ?? traffic.At,
-                    Text = lineText,
+                    Text = _rxLine.ToString(),
                     Tone = ConsoleTone.Rx
                 });
-                index++;
-                start = index;
-                _rxLineAt = traffic.At;
-                continue;
+                _rxLine.Clear();
+                _rxLineAt = null;
+                _skipNextRxLf = ch == '\r';
             }
-            if (ch == '\n')
+            else
             {
-                var lineText = buffered.Substring(start, index - start);
-                EnqueueLine(new ConsoleLine
-                {
-                    At = _rxLineAt ?? traffic.At,
-                    Text = lineText,
-                    Tone = ConsoleTone.Rx
-                });
-                index++;
-                start = index;
-                _rxLineAt = traffic.At;
-                continue;
+                // Split only when more text follows. An exact-length line ending
+                // must not produce an empty paragraph, or split a surrogate pair.
+                if (_rxLine.Length >= MaxRxLineLength && !char.IsHighSurrogate(_rxLine[^1]))
+                    FlushRxLine();
+                _rxLine.Append(ch);
             }
-            index++;
         }
-        if (start > 0) _rxLine.Remove(0, start);
-        if (_rxLine.Length == 0) _rxLineAt = null;
-
         _idleTimer.Stop();
-        _idleTimer.Start();
+        if (_rxLine.Length > 0) _idleTimer.Start();
     }
 
     private string DecodeChunk(byte[] data)
@@ -777,12 +802,10 @@ public partial class TerminalPage : UserControl, IActivatablePage
             _rxLineAt = null;
             return;
         }
-        var pending = _rxLine.ToString();
-        if (pending.EndsWith('\r')) pending = pending[..^1];
         EnqueueLine(new ConsoleLine
         {
             At = _rxLineAt ?? DateTime.Now,
-            Text = pending,
+            Text = _rxLine.ToString(),
             Tone = ConsoleTone.Rx
         });
         _rxLine.Clear();
@@ -791,11 +814,11 @@ public partial class TerminalPage : UserControl, IActivatablePage
 
     private void AddSystemLine(string text, ConsoleTone tone)
     {
-        FlushRxLine();
-        _history.Add(SerialTraffic.System(text));
-        _historyBytes += 0;
-        EnqueueLine(new ConsoleLine { At = DateTime.Now, Text = text, Tone = tone });
+        AddHistory(SerialTraffic.System(text));
         EmptyState.Visibility = Visibility.Collapsed;
+        if (_paused) return;
+        FlushRxLine();
+        EnqueueLine(new ConsoleLine { At = DateTime.Now, Text = text, Tone = tone });
     }
 
     private static ConsoleTone ToneForSystem(string message)
@@ -810,11 +833,23 @@ public partial class TerminalPage : UserControl, IActivatablePage
         return ConsoleTone.Muted;
     }
 
-    private void EnqueueLine(ConsoleLine line) => _pendingLines.Enqueue(line);
+    private void EnqueueLine(ConsoleLine line)
+    {
+        var limit = Math.Clamp(Settings.MaxLines, 200, 20000);
+        while (_pendingLines.Count >= limit) _pendingLines.Dequeue();
+        _pendingLines.Enqueue(line);
+    }
 
     private void FlushRenderQueue()
     {
         if (!_initialized) return;
+
+        // A display option change or history eviction must never unfreeze a paused view.
+        if (_paused)
+        {
+            ConsoleMeta.Text = $"已暂停显示  缓存 {_history.Count} 条（最多 {MaxHistoryEntries} 条 / 2 MB）";
+            return;
+        }
 
         if (_reRenderRequested)
         {
@@ -823,20 +858,15 @@ public partial class TerminalPage : UserControl, IActivatablePage
             return;
         }
 
-        if (_paused)
-        {
-            if (ConsoleMeta is not null)
-                ConsoleMeta.Text = $"已暂停  缓冲 {_pendingLines.Count} 行";
-            return;
-        }
-
         if (_pendingLines.Count == 0) return;
-        while (_pendingLines.Count > 0)
+        ConsoleBox.BeginChange();
+        try
         {
-            var line = _pendingLines.Dequeue();
-            AppendLine(line);
+            for (var i = 0; i < RenderBatchSize && _pendingLines.Count > 0; i++)
+                AppendLine(_pendingLines.Dequeue());
+            TrimConsole();
         }
-        TrimConsole();
+        finally { ConsoleBox.EndChange(); }
         if (Settings.AutoScroll) ConsoleBox.ScrollToEnd();
     }
 
@@ -898,159 +928,33 @@ public partial class TerminalPage : UserControl, IActivatablePage
             _document.Blocks.Remove(_document.Blocks.FirstBlock);
             _renderedLines--;
         }
-        if (_history.Count > max)
-        {
-            var remove = _history.Count - max;
-            for (var i = 0; i < remove; i++) _historyBytes -= _history[i].Length;
-            _history.RemoveRange(0, remove);
-        }
     }
 
     private void RebuildConsole()
     {
+        if (_paused) { _reRenderRequested = true; return; }
+        _idleTimer.Stop();
         _document.Blocks.Clear();
         _renderedLines = 0;
         _pendingLines.Clear();
         _rxLine.Clear();
         _rxLineAt = null;
         _decoder = SerialCodec.GetEncoding(_encodingName).GetDecoder();
+        _skipNextRxLf = false;
+        _lastRxAt = DateTime.MinValue;
 
-        var decoded = BuildLines(_history);
-        foreach (var line in decoded) AppendLine(line);
-        TrimConsole();
-        if (Settings.AutoScroll) ConsoleBox.ScrollToEnd();
+        // Replay through the live formatter so mode, CRLF and decoder state agree.
+        // In particular, retain its partial UTF-8/GBK character for the next live read.
+        foreach (var traffic in _history) RenderTraffic(traffic);
+        _idleTimer.Stop();
+        FlushRxLine();
         EmptyState.Visibility = _history.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    /// <summary>Deterministic full-history formatter used after display option changes.</summary>
-    private List<ConsoleLine> BuildLines(IReadOnlyList<SerialTraffic> history)
-    {
-        var lines = new List<ConsoleLine>();
-        var textMode = RxTextRadio.IsChecked != true;
-        var showTx = ShowTxCheck.IsChecked == true;
-        var encoding = SerialCodec.GetEncoding(_encodingName);
-        var decoder = encoding.GetDecoder();
-        var buffer = new StringBuilder();
-        DateTime? bufferAt = null;
-        DateTime? previousAt = null;
-
-        void FlushBuffer()
-        {
-            if (buffer.Length == 0) return;
-            var text = buffer.ToString();
-            if (text.EndsWith('\r')) text = text[..^1];
-            lines.Add(new ConsoleLine
-            {
-                At = bufferAt ?? DateTime.Now,
-                Text = text,
-                Tone = ConsoleTone.Rx
-            });
-            buffer.Clear();
-            bufferAt = null;
-        }
-
-        void AppendDecoded(string text, DateTime at)
-        {
-            buffer.Append(text);
-            while (true)
-            {
-                var buffered = buffer.ToString();
-                var breakIndex = -1;
-                var breakLength = 0;
-                for (var i = 0; i < buffered.Length; i++)
-                {
-                    if (buffered[i] == '\r')
-                    {
-                        // Hold a trailing CR so CRLF split across read chunks stays one break.
-                        if (i == buffered.Length - 1) break;
-                        breakIndex = i;
-                        breakLength = buffered[i + 1] == '\n' ? 2 : 1;
-                        break;
-                    }
-                    if (buffered[i] == '\n')
-                    {
-                        breakIndex = i;
-                        breakLength = 1;
-                        break;
-                    }
-                }
-                if (breakIndex < 0) break;
-                lines.Add(new ConsoleLine
-                {
-                    At = bufferAt ?? at,
-                    Text = buffered.Substring(0, breakIndex),
-                    Tone = ConsoleTone.Rx
-                });
-                buffer.Remove(0, breakIndex + breakLength);
-                bufferAt = at;
-            }
-        }
-
-        foreach (var traffic in history)
-        {
-            if (traffic.Direction == TrafficDirection.System)
-            {
-                FlushBuffer();
-                lines.Add(new ConsoleLine
-                {
-                    At = traffic.At,
-                    Text = traffic.Message ?? string.Empty,
-                    Tone = ToneForSystem(traffic.Message ?? string.Empty)
-                });
-                previousAt = traffic.At;
-                continue;
-            }
-
-            if (traffic.Direction == TrafficDirection.Tx)
-            {
-                FlushBuffer();
-                if (showTx)
-                {
-                    var text = RxHexRadio.IsChecked == true
-                        ? "→ " + SerialCodec.FormatHex(traffic.Data)
-                        : "→ " + SerialCodec.EscapeForDisplay(encoding.GetString(traffic.Data));
-                    lines.Add(new ConsoleLine { At = traffic.At, Text = text, Tone = ConsoleTone.Tx });
-                }
-                previousAt = traffic.At;
-                continue;
-            }
-
-            if (previousAt is not null && (traffic.At - previousAt.Value).TotalMilliseconds > 80)
-                FlushBuffer();
-            if (!textMode) FlushBuffer();
-
-            if (textMode)
-            {
-                if (bufferAt is null) bufferAt = traffic.At;
-                var chars = new char[encoding.GetMaxCharCount(traffic.Data.Length) + 2];
-                var count = decoder.GetChars(traffic.Data, 0, traffic.Data.Length, chars, 0, false);
-                AppendDecoded(new string(chars, 0, count), traffic.At);
-            }
-            else
-            {
-                var text = SerialCodec.FormatHexLines(traffic.Data, 16, withOffset: false);
-                var parts = text.Split('\n');
-                var first = true;
-                foreach (var part in parts)
-                {
-                    lines.Add(new ConsoleLine
-                    {
-                        At = traffic.At,
-                        Text = first ? part.TrimEnd('\r') : "  " + part.TrimEnd('\r'),
-                        Tone = ConsoleTone.Rx,
-                        Continuation = !first
-                    });
-                    first = false;
-                }
-            }
-            previousAt = traffic.At;
-        }
-        FlushBuffer();
-        return lines;
-    }
 
     private void ResetConsole()
     {
+        _idleTimer.Stop();
         _history.Clear();
         _historyBytes = 0;
         _pendingLines.Clear();
@@ -1059,6 +963,8 @@ public partial class TerminalPage : UserControl, IActivatablePage
         _document.Blocks.Clear();
         _renderedLines = 0;
         _reRenderRequested = false;
+        _skipNextRxLf = false;
+        _lastRxAt = DateTime.MinValue;
         _decoder = SerialCodec.GetEncoding(_encodingName).GetDecoder();
         EmptyState.Visibility = Visibility.Collapsed;
     }
@@ -1087,6 +993,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
         Settings.SendMode = TxHexRadio.IsChecked == true ? PayloadMode.Hex : PayloadMode.Text;
         if (AppServices.Serial.Options is not null) AppServices.Serial.Options.SendMode = Settings.SendMode;
         AppServices.Store.Save();
+        UpdateSendSize();
     }
 
     private void EncodingBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1097,6 +1004,9 @@ public partial class TerminalPage : UserControl, IActivatablePage
         _encodingName = value;
         _decoder = SerialCodec.GetEncoding(_encodingName).GetDecoder();
         if (AppServices.Serial.Options is not null) AppServices.Serial.Options.Encoding = value;
+        Settings.DefaultEncoding = value;
+        AppServices.Store.Save();
+        UpdateSendSize();
         _reRenderRequested = true;
     }
 
@@ -1114,7 +1024,9 @@ public partial class TerminalPage : UserControl, IActivatablePage
         PauseButton.Content = _paused ? "继续" : "暂停";
         if (_paused)
         {
-            ConsoleMeta.Text = $"已暂停  缓冲 {_pendingLines.Count} 行";
+            _idleTimer.Stop();
+            _pendingLines.Clear();
+            ConsoleMeta.Text = "已暂停显示，接收与会话记录继续";
         }
         else
         {
@@ -1249,19 +1161,15 @@ public partial class TerminalPage : UserControl, IActivatablePage
 
     private void Send_Click(object sender, RoutedEventArgs e) => DoSend();
 
-    private void DoSend()
+    private bool DoSend()
     {
+        if (IsSendingFile) return false;
         if (!AppServices.Serial.IsOpen)
         {
             SetTransientHint("串口未打开，请先打开端口", error: true);
-            return;
+            return false;
         }
         var input = SendBox.Text;
-        if (string.IsNullOrEmpty(input))
-        {
-            SetTransientHint("发送区为空", error: true);
-            return;
-        }
         var mode = TxHexRadio.IsChecked == true ? PayloadMode.Hex : PayloadMode.Text;
         var ending = ChoiceValue(EndingBox, LineEnding.None);
         var checksum = ChoiceValue(ChecksumBox, ChecksumKind.None);
@@ -1269,17 +1177,17 @@ public partial class TerminalPage : UserControl, IActivatablePage
         if (!SerialCodec.TryBuildPayload(input, mode, ending, checksum, _encodingName, escapes, out var payload, out var error))
         {
             SetTransientHint(error ?? "无法生成发送数据", error: true);
-            return;
+            return false;
         }
         if (payload.Length == 0)
         {
             SetTransientHint("发送内容为空", error: true);
-            return;
+            return false;
         }
         if (!AppServices.Serial.Send(payload))
         {
             SetTransientHint(AppServices.Serial.LastError.Length > 0 ? AppServices.Serial.LastError : "发送失败", error: true);
-            return;
+            return false;
         }
 
         _sendHistory.Remove(input);
@@ -1292,14 +1200,19 @@ public partial class TerminalPage : UserControl, IActivatablePage
             : SerialCodec.FormatHex(payload.AsSpan(0, 16)) + " …";
         SetTransientHint($"已发送 {payload.Length} 字节  {summary}");
         UpdateSendSize();
+        return true;
     }
 
     private void RecallHistory(int direction)
     {
         if (_sendHistory.Count == 0) return;
-        if (_sendHistoryIndex < 0) _sendHistoryIndex = direction < 0 ? 0 : _sendHistory.Count - 1;
-        else _sendHistoryIndex = Math.Clamp(_sendHistoryIndex + (direction < 0 ? 1 : -1), 0, _sendHistory.Count - 1);
-        SendBox.Text = _sendHistory[_sendHistoryIndex];
+        if (_sendHistoryIndex < 0)
+        {
+            if (direction > 0) return;
+            _historyDraft = SendBox.Text;
+        }
+        _sendHistoryIndex = Math.Clamp(_sendHistoryIndex + (direction < 0 ? 1 : -1), -1, _sendHistory.Count - 1);
+        SendBox.Text = _sendHistoryIndex < 0 ? _historyDraft : _sendHistory[_sendHistoryIndex];
         SendBox.CaretIndex = SendBox.Text.Length;
         UpdateSendSize();
     }
@@ -1342,49 +1255,12 @@ public partial class TerminalPage : UserControl, IActivatablePage
         menu.IsOpen = true;
     }
 
-    private void SendFile_Click(object sender, RoutedEventArgs e)
-    {
-        if (!AppServices.Serial.IsOpen)
-        {
-            SetTransientHint("串口未打开，请先打开端口", error: true);
-            return;
-        }
-        var dialog = new OpenFileDialog
-        {
-            Title = "发送文件",
-            Filter = "所有文件 (*.*)|*.*"
-        };
-        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
-        try
-        {
-            var bytes = File.ReadAllBytes(dialog.FileName);
-            if (bytes.Length == 0)
-            {
-                SetTransientHint("文件为空", error: true);
-                return;
-            }
-            if (bytes.Length > 128 * 1024 * 1024)
-            {
-                SetTransientHint("文件超过 128 MB，已取消发送", error: true);
-                return;
-            }
-            if (AppServices.Serial.Send(bytes))
-                SetTransientHint($"已发送文件 {Path.GetFileName(dialog.FileName)}（{FormatText.Bytes(bytes.Length)}）");
-            else
-                SetTransientHint(AppServices.Serial.LastError, error: true);
-        }
-        catch (Exception ex)
-        {
-            AppServices.LogError("发送文件失败", ex);
-            SetTransientHint($"发送文件失败：{ex.Message}", error: true);
-        }
-    }
-
     private void AutoSend_Changed(object sender, RoutedEventArgs e)
     {
         if (!_initialized || _loadingUi) return;
         if (AutoSendCheck.IsChecked == true)
         {
+            if (IsSendingFile) { AutoSendCheck.IsChecked = false; return; }
             if (!AppServices.Serial.IsOpen)
             {
                 AutoSendCheck.IsChecked = false;
@@ -1398,13 +1274,21 @@ public partial class TerminalPage : UserControl, IActivatablePage
                 return;
             }
             Settings.AutoSendIntervalMs = interval;
+            if (!TryGetSendPayload(out _, out var payloadError))
+            {
+                AutoSendCheck.IsChecked = false;
+                SetTransientHint(payloadError, error: true);
+                return;
+            }
             _autoSendTimer.Interval = TimeSpan.FromMilliseconds(interval);
             _autoSendTimer.Start();
+            AutoSendIntervalBox.IsEnabled = false;
             SetTransientHint($"定时发送已启动，每 {interval} ms 发送一次");
         }
         else
         {
             _autoSendTimer.Stop();
+            AutoSendIntervalBox.IsEnabled = true;
             SetTransientHint("定时发送已停止");
         }
     }
@@ -1420,7 +1304,11 @@ public partial class TerminalPage : UserControl, IActivatablePage
         _autoSendTicking = true;
         try
         {
-            DoSend();
+            if (!DoSend())
+            {
+                AutoSendCheck.IsChecked = false;
+                SetTransientHint("定时发送已停止，请检查发送内容或串口连接", error: true);
+            }
         }
         finally
         {
@@ -1431,21 +1319,32 @@ public partial class TerminalPage : UserControl, IActivatablePage
     private void UpdateSendSize()
     {
         if (!_initialized) return;
+        var valid = TryGetSendPayload(out var payload, out var error);
+        EscapeCheck.IsEnabled = TxHexRadio.IsChecked != true;
+        SendButton.IsEnabled = valid && AppServices.Serial.IsOpen && !IsSendingFile;
+        SendButton.ToolTip = !AppServices.Serial.IsOpen ? "请先打开串口" : valid ? "发送 (Ctrl+Enter)" : error;
+        AutoSendCheck.IsEnabled = AppServices.Serial.IsOpen && !IsSendingFile;
+        UpdateFileSendButton();
+        SendSizeText.Text = valid ? $"{payload.Length} B" : "0 B";
+        SendSizeText.Foreground = (Brush)FindResource(valid ? "AppTextTertiaryBrush" : "AppDangerBrush");
+        SendPreviewText.Text = string.IsNullOrEmpty(SendBox.Text) ? valid ? "仅发送行尾 / 校验  " + SerialCodec.FormatHex(payload) : "输入发送内容，在这里预览实际字节" : valid
+            ? "HEX  " + SerialCodec.FormatHex(payload.AsSpan(0, Math.Min(payload.Length, 48))) + (payload.Length > 48 ? " …" : string.Empty)
+            : error;
+        SendPreviewText.ToolTip = SendPreviewText.Text;
+        SendPreviewText.Foreground = (Brush)FindResource(valid || string.IsNullOrEmpty(SendBox.Text) ? "AppTextTertiaryBrush" : "AppDangerBrush");
+    }
+
+    private bool TryGetSendPayload(out byte[] payload, out string error)
+    {
+        payload = Array.Empty<byte>();
+        error = "请输入发送内容";
         var mode = TxHexRadio.IsChecked == true ? PayloadMode.Hex : PayloadMode.Text;
         var ending = ChoiceValue(EndingBox, LineEnding.None);
         var checksum = ChoiceValue(ChecksumBox, ChecksumKind.None);
         var escapes = EscapeCheck.IsChecked == true;
-        var valid = SerialCodec.TryBuildPayload(SendBox.Text ?? string.Empty, mode, ending, checksum, _encodingName, escapes,
-            out var payload, out var error);
-        if (!valid)
-        {
-            SendSizeText.Text = "HEX 无效";
-            SendSizeText.Foreground = (Brush)FindResource("AppDangerBrush");
-            return;
-        }
-        SendSizeText.Text = $"{payload.Length} B";
-        SendSizeText.Foreground = (Brush)FindResource("AppTextTertiaryBrush");
-        _ = error;
+        var valid = SerialCodec.TryBuildPayload(SendBox.Text, mode, ending, checksum, _encodingName, escapes, out payload, out var reason);
+        error = reason ?? (payload.Length == 0 ? "发送内容为空" : string.Empty);
+        return valid && payload.Length > 0;
     }
 
     private void SendBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateSendSize();
@@ -1500,6 +1399,7 @@ public partial class TerminalPage : UserControl, IActivatablePage
     public void SendQuickCommand(QuickCommand command)
     {
         if (command is null) return;
+        if (IsSendingFile) { SetTransientHint("文件正在发送，请先取消或等待完成", error: true); return; }
         _loadingUi = true;
         try
         {
@@ -1578,6 +1478,97 @@ public partial class TerminalPage : UserControl, IActivatablePage
     // ---------------------------------------------------------------- UI smoke hooks
 
     public int ConsoleLineCount => _document.Blocks.Count;
+
+    /// <summary>Deterministic rendering regressions; invoke after closing the smoke DEMO session.</summary>
+    public IReadOnlyList<(string Name, bool Ok, string Detail)> CheckRenderingForSmoke()
+    {
+        var checks = new List<(string Name, bool Ok, string Detail)>();
+        var previousMode = RxHexRadio.IsChecked == true;
+        var previousEncoding = _encodingName;
+        var previousMaxLines = Settings.MaxLines;
+        string Text() => new TextRange(_document.ContentStart, _document.ContentEnd).Text;
+        void Drain()
+        {
+            FlushRxLine();
+            for (var i = 0; i < 110 && (_reRenderRequested || _pendingLines.Count > 0); i++)
+                FlushRenderQueue();
+        }
+        void Check(string name, bool ok, string detail = "") => checks.Add((name, ok, detail));
+        var at = DateTime.Now;
+        try
+        {
+            _paused = false;
+            _encodingName = "utf-8";
+            RxTextRadio.IsChecked = true;
+            ResetConsole();
+            PushTraffic(SerialTraffic.Rx(at, Encoding.UTF8.GetBytes("Hello\r\n")));
+            _reRenderRequested = true;
+            Drain();
+            Check("文本历史重排保留文本", Text().Contains("Hello", StringComparison.Ordinal));
+
+            RxHexRadio.IsChecked = true;
+            Drain();
+            Check("HEX 历史重排显示字节", Text().Contains("48 65 6C 6C 6F", StringComparison.Ordinal));
+
+            RxTextRadio.IsChecked = true;
+            ResetConsole();
+            PushTraffic(SerialTraffic.Rx(at, new byte[] { 0xE4, 0xB8 }));
+            _reRenderRequested = true;
+            Drain();
+            PushTraffic(SerialTraffic.Rx(at.AddMilliseconds(20), new byte[] { 0xAD, 13, 10 }));
+            Drain();
+            Check("重排后保留跨块 UTF-8 字符", Text().Contains("中", StringComparison.Ordinal) && !Text().Contains('\uFFFD'));
+
+            ResetConsole();
+            PushTraffic(SerialTraffic.Rx(at, Encoding.UTF8.GetBytes("A\r")));
+            Drain();
+            PushTraffic(SerialTraffic.Rx(at.AddSeconds(1), Encoding.UTF8.GetBytes("\nB\r\n")));
+            Drain();
+            Check("延迟 CRLF 不产生多余空行", ConsoleLineCount == 2, $"{ConsoleLineCount} lines");
+
+            var frozen = Text();
+            Pause_Click(this, new RoutedEventArgs());
+            PushTraffic(SerialTraffic.Rx(at.AddSeconds(2), Encoding.UTF8.GetBytes("paused-payload\r\n")));
+            _reRenderRequested = true;
+            FlushRenderQueue();
+            Check("暂停时选项重排保持画面不变", Text() == frozen && _pendingLines.Count == 0);
+            Pause_Click(this, new RoutedEventArgs());
+            Drain();
+            Check("恢复后重放暂停期间数据", Text().Contains("paused-payload", StringComparison.Ordinal));
+
+            ResetConsole();
+            Settings.MaxLines = 200;
+            PushTraffic(SerialTraffic.Rx(at, Encoding.UTF8.GetBytes(string.Concat(Enumerable.Repeat("line\n", 1000)))));
+            Check("待渲染队列有上限", _pendingLines.Count <= 200, $"{_pendingLines.Count} lines");
+            Drain();
+            Check("可见控制台遵守行数限制", ConsoleLineCount == 200, $"{ConsoleLineCount} lines");
+
+            ResetConsole();
+            PushTraffic(SerialTraffic.Rx(at, Encoding.UTF8.GetBytes(new string('x', MaxRxLineLength * 2 + 1))));
+            Check("无换行连续数据分段处理", _rxLine.Length <= MaxRxLineLength && _pendingLines.Count == 2);
+
+            ResetConsole();
+            PushTraffic(SerialTraffic.Rx(at, Encoding.UTF8.GetBytes(new string('x', MaxRxLineLength) + "\r\n")));
+            Drain();
+            Check("恰好达到分段长度不产生空行", ConsoleLineCount == 1, $"{ConsoleLineCount} lines");
+
+            ResetConsole();
+            PushTraffic(SerialTraffic.Rx(at, Encoding.UTF8.GetBytes(new string('x', MaxRxLineLength - 1) + "\U0001F600y\n")));
+            Drain();
+            Check("长行分段保留完整 emoji", Text().Contains("\U0001F600", StringComparison.Ordinal), $"{ConsoleLineCount} lines");
+        }
+        finally
+        {
+            Settings.MaxLines = previousMaxLines;
+            _encodingName = previousEncoding;
+            _paused = false;
+            PauseButton.Content = "暂停";
+            if (previousMode) RxHexRadio.IsChecked = true; else RxTextRadio.IsChecked = true;
+            ResetConsole();
+            UpdateUiState();
+        }
+        return checks;
+    }
 
     public async Task<bool> OpenDemoForSmokeAsync()
     {

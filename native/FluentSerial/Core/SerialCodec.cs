@@ -57,55 +57,49 @@ public static class SerialCodec
         error = null;
         if (string.IsNullOrWhiteSpace(input)) return true;
 
-        var digits = new StringBuilder(input.Length);
-        var digitPositions = new List<int>();
-        for (var i = 0; i < input.Length; i++)
+        var result = new List<byte>(input.Length / 2);
+        for (var i = 0; i < input.Length;)
         {
-            var ch = input[i];
-            if (char.IsWhiteSpace(ch) || ch is ',' or ';' or ':' or '|' or '-' or '\u3001')
-                continue;
-
-            if (ch is '0' && i + 1 < input.Length && (input[i + 1] is 'x' or 'X'))
+            if (IsHexSeparator(input[i]))
             {
-                i += 1;
+                i++;
                 continue;
             }
 
-            if (ch is 'x' or 'X') continue; // tolerate bare x after 0x stripping
+            if (input[i] == '0' && i + 1 < input.Length && input[i + 1] is 'x' or 'X')
+                i += 2;
 
-            if (Uri.IsHexDigit(ch))
+            var start = i;
+            while (i < input.Length && !IsHexSeparator(input[i]))
             {
-                digits.Append(ch);
-                digitPositions.Add(i);
-                continue;
+                if (!Uri.IsHexDigit(input[i]))
+                {
+                    error = $"HEX 中包含无效字符“{input[i]}”（位置 {i + 1}）";
+                    return false;
+                }
+                i++;
             }
 
-            error = $"HEX 中包含无效字符“{ch}”（位置 {i + 1}）";
-            return false;
-        }
-
-        if (digits.Length == 0) return true;
-        if (digits.Length % 2 != 0)
-        {
-            var pos = digitPositions[^1] + 1;
-            error = $"HEX 字节必须是偶数位，最后一个半字节位于位置 {pos}";
-            return false;
-        }
-
-        var result = new byte[digits.Length / 2];
-        for (var i = 0; i < result.Length; i++)
-        {
-            if (!byte.TryParse(digits.ToString(i * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var value))
+            if (i == start)
             {
-                error = $"无法解析 HEX 字节 #{i + 1}";
+                error = $"HEX 前缀 0x 后缺少字节（位置 {start - 1}）";
                 return false;
             }
-            result[i] = value;
+            if ((i - start) % 2 != 0)
+            {
+                error = $"HEX 每组必须包含完整字节，位置 {start + 1} 的数据有奇数个十六进制数字";
+                return false;
+            }
+            for (var offset = start; offset < i; offset += 2)
+                result.Add(byte.Parse(input.AsSpan(offset, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
         }
 
-        bytes = result;
+        bytes = result.ToArray();
         return true;
     }
+
+    private static bool IsHexSeparator(char ch)
+        => char.IsWhiteSpace(ch) || ch is ',' or ';' or ':' or '|' or '-' or '\u3001';
 
     public static string FormatHex(ReadOnlySpan<byte> data, string separator = " ")
     {
@@ -145,12 +139,22 @@ public static class SerialCodec
         if (!useEscapes) return encoding.GetBytes(text);
 
         var bytes = new List<byte>(text.Length);
+        var textRun = new StringBuilder(text.Length);
+        void FlushText()
+        {
+            if (textRun.Length == 0) return;
+            bytes.AddRange(encoding.GetBytes(textRun.ToString()));
+            textRun.Clear();
+        }
+
         for (var i = 0; i < text.Length; i++)
         {
             var ch = text[i];
             if (ch != '\\' || i + 1 >= text.Length)
             {
-                bytes.AddRange(encoding.GetBytes(ch.ToString()));
+                // Encode complete UTF-16 runs so literal and escaped surrogate pairs
+                // remain intact. Encoding individual chars corrupts emoji to U+FFFD.
+                textRun.Append(ch);
                 continue;
             }
 
@@ -158,53 +162,55 @@ public static class SerialCodec
             switch (next)
             {
                 case 'r':
-                    bytes.Add(0x0D);
+                    textRun.Append('\r');
                     i += 1;
                     break;
                 case 'n':
-                    bytes.Add(0x0A);
+                    textRun.Append('\n');
                     i += 1;
                     break;
                 case 't':
-                    bytes.Add(0x09);
+                    textRun.Append('\t');
                     i += 1;
                     break;
                 case '0':
-                    bytes.Add(0x00);
+                    textRun.Append('\0');
                     i += 1;
                     break;
                 case '\\':
-                    bytes.Add(0x5C);
+                    textRun.Append('\\');
                     i += 1;
                     break;
                 case 'x' or 'X':
                     if (i + 3 < text.Length && Uri.IsHexDigit(text[i + 2]) && Uri.IsHexDigit(text[i + 3]))
                     {
+                        FlushText();
                         bytes.Add(byte.Parse(text.Substring(i + 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
                         i += 3;
                     }
                     else
                     {
                         // Leave malformed escapes untouched rather than losing the user's text.
-                        bytes.Add(0x5C);
+                        textRun.Append('\\');
                     }
                     break;
                 case 'u':
                     if (i + 5 < text.Length && ushort.TryParse(text.Substring(i + 2, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var code))
                     {
-                        bytes.AddRange(encoding.GetBytes(char.ConvertFromUtf32(code)));
+                        textRun.Append((char)code);
                         i += 5;
                     }
                     else
                     {
-                        bytes.Add(0x5C);
+                        textRun.Append('\\');
                     }
                     break;
                 default:
-                    bytes.Add(0x5C);
+                    textRun.Append('\\');
                     break;
             }
         }
+        FlushText();
         return bytes.ToArray();
     }
 

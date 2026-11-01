@@ -22,6 +22,8 @@ public partial class MainWindow : FluentWindow
     public MainWindow()
     {
         InitializeComponent();
+        Width = Math.Max(MinWidth, Math.Min(Width, SystemParameters.WorkArea.Width));
+        Height = Math.Max(MinHeight, Math.Min(Height, SystemParameters.WorkArea.Height));
         Loaded += OnLoaded;
         AppServices.Serial.StateChanged += OnSerialStateChanged;
         ThemeService.ThemeChanged += UpdateThemeButton;
@@ -255,8 +257,19 @@ public partial class MainWindow : FluentWindow
                     e.Handled = true;
                     return;
                 case Key.S:
+                    if (ContentHost.Content is SettingsPage settings)
+                    {
+                        settings.SaveSettings();
+                        e.Handled = true;
+                        return;
+                    }
                     Navigate("terminal");
                     Terminal?.SaveConsoleFromShortcut();
+                    e.Handled = true;
+                    return;
+                case Key.F:
+                    Navigate("terminal");
+                    Terminal?.FocusConsoleSearch();
                     e.Handled = true;
                     return;
             }

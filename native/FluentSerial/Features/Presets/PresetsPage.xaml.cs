@@ -87,11 +87,26 @@ public partial class PresetsPage : UserControl, IActivatablePage
         }
 
         SearchHint.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ResetFilterButton.Visibility = filtering ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => RefreshList();
 
     private void ScopeFilter_SelectionChanged(object sender, SelectionChangedEventArgs e) => RefreshList();
+
+    private void ResetFilter_Click(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Clear();
+        ScopeFilter.SelectedIndex = 0;
+        SearchBox.Focus();
+    }
+
+    private void FavoritePreset_Click(object sender, RoutedEventArgs e)
+    {
+        if (ProfileFrom(sender) is not { } profile) return;
+        profile.Favorite = !profile.Favorite;
+        AppServices.NotifyDataChanged();
+    }
 
     private void NewPreset_Click(object sender, RoutedEventArgs e) => ShowPresetDialog(null);
 
